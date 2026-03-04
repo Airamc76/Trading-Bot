@@ -96,9 +96,10 @@ def run_cycle(dry_run: bool = False):
     # ── Procesar cada par ─────────────────────────────────────────
     current_prices = {}
     all_signals    = []
+    all_prices_to_save = []
 
     for pair, df in market_data.items():
-        save_prices(dataframe_to_db_records(df, pair, config.PRIMARY_TIMEFRAME))
+        all_prices_to_save.extend(dataframe_to_db_records(df, pair, config.PRIMARY_TIMEFRAME))
 
         df_ind = calculate_all(df.copy())
         vals   = get_latest_values(df_ind)
@@ -117,12 +118,18 @@ def run_cycle(dry_run: bool = False):
         })
         all_signals.append(signal)
 
-        # Log de razonamiento para el dashboard
+    # Guardar todos los precios en un solo lote para evitar timeouts
+    if all_prices_to_save:
+        save_prices(all_prices_to_save)
+
+    # Log de razonamiento y alertas
+    for signal in all_signals:
+        pair = signal["pair"]
         reasons_text = " | ".join([r["note"] for r in signal["reasons"]])
         log_system_event("INFO", f"🔍 {pair}: Score {signal['score']:.1f}/10 - {reasons_text}")
 
         if signal["score"] >= config.MIN_SCORE_ALERT:
-            logger.info(format_signal_summary(pair, config.PRIMARY_TIMEFRAME, signal, vals["price"]))
+            logger.info(format_signal_summary(pair, config.PRIMARY_TIMEFRAME, signal, signal["price"]))
 
     # ── Cerrar trades que tocaron SL/TP ──────────────────────────
     closed = broker.check_and_close_trades(current_prices)

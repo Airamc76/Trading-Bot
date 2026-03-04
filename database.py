@@ -125,7 +125,7 @@ class TursoClient:
             return []
         payload = {"requests": self._pending + [{"type": "close"}]}
         import requests
-        resp = self.session.post(self.base, json=payload, headers=self.headers, timeout=15)
+        resp = self.session.post(self.base, json=payload, headers=self.headers, timeout=60)
         resp.raise_for_status()
         results = resp.json().get("results", [])
         self._pending = []
