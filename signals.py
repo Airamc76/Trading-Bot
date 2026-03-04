@@ -116,7 +116,8 @@ def score_signal(vals, config, sentiment_score=0.0):
         "score": float(final_score),
         "reasons": final_reasons,
         "stop_loss": stop_loss,
-        "take_profit": take_profit
+        "take_profit": take_profit,
+        "sentiment": sentiment_score
     }
 
 def format_signal_summary(pair, timeframe, signal, price):

@@ -77,7 +77,7 @@ body::after{{
 @keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 6px var(--green)}}50%{{opacity:.2;box-shadow:none}}}}
 
 /* KPIs */
-.kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}}
+.kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}}
 @media(max-width:900px){{.kpis{{grid-template-columns:repeat(2,1fr)}}}}
 .kpi{{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:20px 22px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;cursor:default}}
 .kpi:hover{{border-color:var(--cyan);transform:translateY(-1px)}}
@@ -115,6 +115,7 @@ body::after{{
 .dSELL{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.2)}}
 .dNEUTRAL{{background:rgba(61,90,122,.2);color:var(--muted);border:1px solid var(--border)}}
 .sscore{{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:600}}
+.ssent{{font-size:10px;margin-left:8px}}
 
 /* TABLE */
 .tw{{overflow-x:auto}}
@@ -212,6 +213,20 @@ const fd=ts=>{{if(!ts)return'—';try{{return new Date(ts).toLocaleString('es-AR
     <div class="kpi"><div class="ka ${{ret>=0?'g':'r'}}"></div><div class="klabel">📊 Retorno</div><div class="kval ${{ret>=0?'g':'r'}}">${{ret>=0?'+':''}}${{f(ret)}}%</div><div class="ksub">P&L: $${{f(D.total_pnl)}}</div></div>
     <div class="kpi"><div class="ka y"></div><div class="klabel">🎯 Win Rate</div><div class="kval y">${{f(D.win_rate,1)}}%</div><div class="ksub">${{D.wins}}W / ${{D.losses}}L</div></div>
     <div class="kpi"><div class="ka c"></div><div class="klabel">📈 Trades</div><div class="kval c">${{D.total_trades}}</div><div class="ksub">${{D.open_trades}} abiertos</div></div>
+    <div class="kpi" id="sentKpi"></div>
+  `;
+  
+  // Calculate average sentiment
+  const sigs = D.signals || [];
+  const avgSent = sigs.length ? sigs.reduce((a,b)=>a+(Number(b.sentiment)||0), 0) / sigs.length : 0;
+  const sentColor = avgSent > 0.1 ? 'g' : avgSent < -0.1 ? 'r' : 'y';
+  const sentLabel = avgSent > 0.4 ? 'MUY ALCISTA' : avgSent > 0.1 ? 'ALCISTA' : avgSent < -0.4 ? 'MUY BAJISTA' : avgSent < -0.1 ? 'BAJISTA' : 'NEUTRAL';
+  
+  document.getElementById('sentKpi').innerHTML = `
+    <div class="ka ${{sentColor}}"></div>
+    <div class="klabel">🎭 Sentimiento</div>
+    <div class="kval ${{sentColor}}">${{sentLabel}}</div>
+    <div class="ksub">Score: ${{avgSent.toFixed(2)}} (Promedio)</div>
   `;
 }})();
 
@@ -224,7 +239,10 @@ const fd=ts=>{{if(!ts)return'—';try{{return new Date(ts).toLocaleString('es-AR
 // Señales
 (()=>{{
   const el=document.getElementById('sigList'),s=D.signals||[];
-  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,7).map(x=>`<div class="sitem"><div><div class="spair">${{x.pair}}</div><div class="sts">${{fd(x.timestamp)}}</div></div><span class="dbadge d${{x.direction}}">${{x.direction}}</span><div class="sscore">${{f(x.score,1)}}/10</div></div>`).join('');
+  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,7).map(x=>{{
+    const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
+    return `<div class="sitem"><div><div class="spair">${{x.pair}} <span class="ssent" title="Sentimiento: ${{Number(x.sentiment).toFixed(2)}}">${{sentIcon}}</span></div><div class="sts">${{fd(x.timestamp)}}</div></div><span class="dbadge d${{x.direction}}">${{x.direction}}</span><div class="sscore">${{f(x.score,1)}}/10</div></div>`;
+  }}).join('');
 }})();
 
 // Trades

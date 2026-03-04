@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS signals (
     timestamp   TEXT DEFAULT (datetime('now')),
     direction   TEXT, score REAL, price REAL,
     stop_loss   REAL, take_profit REAL,
-    reasons     TEXT, executed INTEGER DEFAULT 0
+    reasons     TEXT, executed INTEGER DEFAULT 0,
+    sentiment   REAL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS paper_trades (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -193,11 +194,11 @@ def save_signal(signal: dict) -> int:
         reasons = json.dumps(reasons)
     d = db()
     d.execute(
-        "INSERT INTO signals (pair,timeframe,timestamp,direction,score,price,stop_loss,take_profit,reasons) "
-        "VALUES (?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO signals (pair,timeframe,timestamp,direction,score,price,stop_loss,take_profit,reasons,sentiment) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?)",
         [signal["pair"], signal["timeframe"], signal["timestamp"],
          signal["direction"], signal["score"], signal["price"],
-         signal.get("stop_loss"), signal.get("take_profit"), reasons]
+         signal.get("stop_loss"), signal.get("take_profit"), reasons, signal.get("sentiment", 0)]
     )
     d.commit()
     rows = d.query("SELECT id FROM signals ORDER BY id DESC LIMIT 1")
@@ -263,7 +264,7 @@ def get_dashboard_data() -> dict:
     open_t = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'OPEN'")[0]["c"] or 0
     pnl_r  = d.query("SELECT COALESCE(SUM(pnl),0) as s FROM paper_trades WHERE status != 'OPEN'")[0]["s"] or 0
     bal_r  = d.query("SELECT balance FROM portfolio ORDER BY id DESC LIMIT 1")
-    signals = d.query("SELECT pair,direction,score,price,timestamp FROM signals ORDER BY id DESC LIMIT 20")
+    signals = d.query("SELECT pair,direction,score,price,timestamp,sentiment FROM signals ORDER BY id DESC LIMIT 20")
     trades  = d.query("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 30")
     bal_hist= d.query("SELECT timestamp,balance FROM portfolio ORDER BY id DESC LIMIT 60")
 

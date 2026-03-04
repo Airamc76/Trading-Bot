@@ -125,6 +125,7 @@ def run_cycle(dry_run: bool = False):
                 "stop_loss":   signal.get("stop_loss"),
                 "take_profit": signal.get("take_profit"),
                 "reasons":     json.dumps(signal.get("reasons", [])),
+                "sentiment":   signal.get("sentiment", 0)
             })
             trade_id = broker.open_trade(
                 signal_id   = signal_id,
