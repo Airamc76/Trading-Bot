@@ -291,10 +291,10 @@ def close_paper_trade(trade_id: int, close_price: float, reason: str) -> float:
     now     = datetime.now(timezone.utc).isoformat()
     d.execute(
         "UPDATE paper_trades SET close_time=?,close_price=?,pnl=?,pnl_pct=?,status=?,close_reason=? WHERE id=?",
-        [now, close_price, round(pnl, 2), round(pnl_pct, 2), status, reason, trade_id]
+        [now, close_price, round(float(pnl), 2), round(float(pnl_pct), 2), status, reason, trade_id]
     )
     d.commit()
-    return round(pnl, 2)
+    return round(float(pnl), 2)
 
 
 def save_trade_feedback(trade_id: int, lesson: str, score: float):
