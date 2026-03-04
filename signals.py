@@ -117,7 +117,12 @@ def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
     else:
         direction = "NEUTRAL"
         final_score = max(buy_score, sell_score)
-        final_reasons = [{"note": "Sin señales claras"}]
+        # Transparencia: Mostrar qué está viendo el bot aunque no opere
+        dominant_reasons = buy_reasons if buy_score >= sell_score else sell_reasons
+        if dominant_reasons:
+            final_reasons = [{"note": "(Neutral) " + r["note"]} for r in dominant_reasons]
+        else:
+            final_reasons = [{"note": "Sin señales claras"}]
 
     # Calcular niveles de SL y TP basados en ATR
     stop_loss = None
