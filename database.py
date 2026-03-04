@@ -213,6 +213,15 @@ def get_latest_macro():
     r = d.query("SELECT * FROM macro_history ORDER BY id DESC LIMIT 1")
     return r[0] if r else None
 
+def log_heartbeat(status: str, note: str = ""):
+    d = db()
+    d.execute("INSERT INTO hb_log (timestamp, status, note) VALUES (?,?,?)",
+              [datetime.now(timezone.utc).isoformat(), status, note])
+    d.commit()
+
+def get_recent_heartbeats(limit=5):
+    return db().query("SELECT * FROM hb_log ORDER BY id DESC LIMIT ?", [limit])
+
 def save_signal(signal: dict) -> int:
     reasons = signal.get("reasons", [])
     if isinstance(reasons, list):
@@ -320,5 +329,6 @@ def get_dashboard_data() -> dict:
         "trades":          trades,
         "balance_history": list(reversed(bal_hist)),
         "macro":           macro,
+        "heartbeats":      get_recent_heartbeats(),
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }

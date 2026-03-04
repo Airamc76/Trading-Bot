@@ -28,7 +28,7 @@ from database import (
     initialize_database, save_prices, save_signal,
     get_latest_signals, get_open_trades, close_paper_trade,
     save_portfolio_snapshot, dataframe_to_db_records,
-    save_macro_context
+    save_macro_context, log_heartbeat
 )
 from fetcher import fetch_all_pairs
 from indicators import calculate_all, get_latest_values
@@ -57,6 +57,7 @@ def run_cycle(dry_run: bool = False):
     start = datetime.now(timezone.utc)
     logger.info(f"{'─'*55}")
     logger.info(f"🔄 Ciclo — {start.strftime('%Y-%m-%d %H:%M UTC')}")
+    log_heartbeat("RUNNING", f"Iniciando ciclo en {start.strftime('%H:%M')}")
     logger.info(f"   Pares: {', '.join(config.ALL_PAIRS)}")
     logger.info(f"   DB:    {'Turso ☁️' if config.USE_TURSO else 'SQLite local'}")
 
@@ -180,6 +181,7 @@ def run_cycle(dry_run: bool = False):
           f"Win Rate: {stats['win_rate']:.1f}%  |  "
           f"Abiertos: {stats['open_trades']}")
     print(f"⏱  Completado en {elapsed:.1f}s\n")
+    log_heartbeat("SUCCESS", f"Ciclo completado en {elapsed:.1f}s")
 
 
 def show_stats():

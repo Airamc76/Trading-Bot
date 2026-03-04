@@ -162,6 +162,14 @@ footer span{{color:var(--cyan)}}
 .rHIGH{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid var(--green)}}
 .rLOW{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}}
 .rNEUTRAL{{background:var(--s1);color:var(--muted);border:1px solid var(--border)}}
+
+/* PULSE */
+.pulse-item{{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:10px;border-bottom:1px solid var(--border)}}
+.pulse-item:last-child{{border-bottom:none}}
+.pdot{{width:6px;height:6px;border-radius:50%;margin-right:8px;display:inline-block}}
+.pSUCCESS{{background:var(--green);box-shadow:0 0 5px var(--green)}}
+.pRUNNING{{background:var(--gold);box-shadow:0 0 5px var(--gold);animation: blink 1s infinite}}
+@keyframes blink {{ 0%{{opacity:1}} 50%{{opacity:0.3}} 100%{{opacity:1}} }}
 </style>
 </head>
 <body>
@@ -220,6 +228,10 @@ footer span{{color:var(--cyan)}}
   <div class="panel">
     <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
     <div class="pb" id="macroBox"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Activity Heartbeat</span></div>
+    <div class="pb" id="pulseBox"></div>
   </div>
 </div>
 
