@@ -1,0 +1,109 @@
+from datetime import datetime
+
+def score_signal(vals, config):
+    """
+    Evalúa los indicadores y devuelve un score de 0 a 10 y una dirección.
+    """
+    score = 0
+    reasons = []
+    
+    price = vals.get("price")
+    rsi = vals.get("rsi")
+    ema_20 = vals.get("ema_20")
+    ema_50 = vals.get("ema_50")
+    ema_200 = vals.get("ema_200")
+    macd_hist = vals.get("macd_hist")
+    bb_upper = vals.get("bb_upper")
+    bb_lower = vals.get("bb_lower")
+    atr = vals.get("atr", 0)
+
+    if not all([price, rsi, ema_20, ema_200]):
+        return {"direction": "NEUTRAL", "score": 0, "reasons": [{"note": "Faltan datos indicadores"}]}
+
+    # 1. Tendencia Principal (EMA 200)
+    trend = "UP" if price > ema_200 else "DOWN"
+    
+    # 2. Análisis para COMPRA
+    buy_score = 0
+    buy_reasons = []
+    
+    if price > ema_200:
+        buy_score += 2
+        buy_reasons.append({"note": "Tendencia alcista (Precio > EMA200)"})
+        
+    if rsi < 40:
+        buy_score += 2
+        buy_reasons.append({"note": f"RSI en zona de acumulación ({rsi:.1f})"})
+    elif rsi < 30:
+        buy_score += 3
+        buy_reasons.append({"note": f"RSI Sobrevendido ({rsi:.1f})"})
+        
+    if macd_hist and macd_hist > 0:
+        buy_score += 2
+        buy_reasons.append({"note": "MACD Histograma positivo"})
+        
+    if bb_lower and price <= bb_lower * 1.01:
+        buy_score += 3
+        buy_reasons.append({"note": "Precio cerca de Banda Inferior BB"})
+
+    # 3. Análisis para VENTA
+    sell_score = 0
+    sell_reasons = []
+    
+    if price < ema_200:
+        sell_score += 2
+        sell_reasons.append({"note": "Tendencia bajista (Precio < EMA200)"})
+        
+    if rsi > 60:
+        sell_score += 2
+        sell_reasons.append({"note": f"RSI en zona de distribución ({rsi:.1f})"})
+    elif rsi > 70:
+        sell_score += 3
+        sell_reasons.append({"note": f"RSI Sobrecomprado ({rsi:.1f})"})
+        
+    if macd_hist and macd_hist < 0:
+        sell_score += 2
+        sell_reasons.append({"note": "MACD Histograma negativo"})
+        
+    if bb_upper and price >= bb_upper * 0.99:
+        sell_score += 3
+        sell_reasons.append({"note": "Precio cerca de Banda Superior BB"})
+
+    # Determinar dirección final
+    if buy_score >= sell_score and buy_score >= 5:
+        direction = "BUY"
+        final_score = min(buy_score, 10)
+        final_reasons = buy_reasons
+    elif sell_score > buy_score and sell_score >= 5:
+        direction = "SELL"
+        final_score = min(sell_score, 10)
+        final_reasons = sell_reasons
+    else:
+        direction = "NEUTRAL"
+        final_score = max(buy_score, sell_score)
+        final_reasons = [{"note": "Sin señales claras"}]
+
+    # Calcular niveles de SL y TP basados en ATR
+    stop_loss = None
+    take_profit = None
+    
+    if direction == "BUY":
+        stop_loss = price - (atr * config.STOP_LOSS_ATR)
+        take_profit = price + (atr * config.STOP_LOSS_ATR * config.TAKE_PROFIT_R)
+    elif direction == "SELL":
+        stop_loss = price + (atr * config.STOP_LOSS_ATR)
+        take_profit = price - (atr * config.STOP_LOSS_ATR * config.TAKE_PROFIT_R)
+
+    return {
+        "direction": direction,
+        "score": float(final_score),
+        "reasons": final_reasons,
+        "stop_loss": stop_loss,
+        "take_profit": take_profit
+    }
+
+def format_signal_summary(pair, timeframe, signal, price):
+    """Formatea la señal para imprimir en consola"""
+    emoji = "🟢" if signal["direction"] == "BUY" else "🔴" if signal["direction"] == "SELL" else "⚪"
+    notes = " | ".join([r["note"] for r in signal["reasons"]])
+    return f"{emoji} {pair} ({timeframe}) | Score: {signal['score']:.1f} | Precio: {price:.4g} | {notes}"
