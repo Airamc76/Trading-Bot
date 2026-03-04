@@ -33,11 +33,11 @@ def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
         buy_score += 2
         buy_reasons.append({"note": "Tendencia alcista (Precio > EMA200)"})
         
-    if rsi < 40:
+    if rsi < 45:
         buy_score += 2
-        buy_reasons.append({"note": f"RSI en zona de acumulación ({rsi:.1f})"})
-    elif rsi < 30:
-        buy_score += 3
+        buy_reasons.append({"note": f"RSI en zona baja ({rsi:.1f})"})
+    if rsi < 35:
+        buy_score += 1 # Total +3 if < 35
         buy_reasons.append({"note": f"RSI Sobrevendido ({rsi:.1f})"})
         
     if macd_hist and macd_hist > 0:
@@ -45,16 +45,16 @@ def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
         buy_reasons.append({"note": "MACD Histograma positivo"})
         
     if bb_lower and price <= bb_lower * 1.01:
-        buy_score += 3
+        buy_score += 2
         buy_reasons.append({"note": "Precio cerca de Banda Inferior BB"})
 
-    # 2.5 Sentimiento del mercado
-    if sentiment_score > 0.2:
+    # 2.5 Sentimiento del mercado (Más sensible)
+    if sentiment_score > 0.1:
         buy_score += 2
-        buy_reasons.append({"note": f"Sentimiento alcista detectado ({sentiment_score:.2f})"})
-    elif sentiment_score > 0.5:
-        buy_score += 3
-        buy_reasons.append({"note": f"Sentimiento MUY alcista detectado ({sentiment_score:.2f})"})
+        buy_reasons.append({"note": f"Sentimiento alcista ({sentiment_score:.2f})"})
+    if sentiment_score > 0.4:
+        buy_score += 1 # Total +3 if > 0.4
+        buy_reasons.append({"note": f"Sentimiento MUY alcista ({sentiment_score:.2f})"})
 
     # 2.6 Contexto Macro (Confluencia Global)
     if macro_context:

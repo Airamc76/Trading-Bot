@@ -19,7 +19,7 @@ FOREX_PAIRS  = [p.strip() for p in os.getenv("FOREX_PAIRS",  "EURUSD=X,GBPUSD=X,
 ALL_PAIRS    = CRYPTO_PAIRS + FOREX_PAIRS
 
 # ── Timeframes ────────────────────────────────────────────────────────────────
-PRIMARY_TIMEFRAME = "1h"
+PRIMARY_TIMEFRAME = "15m"
 
 # ── Indicadores técnicos ──────────────────────────────────────────────────────
 RSI_PERIOD     = 14
@@ -38,13 +38,13 @@ ATR_PERIOD     = 14
 # ── Gestión de riesgo ─────────────────────────────────────────────────────────
 PAPER_CAPITAL   = float(os.getenv("PAPER_CAPITAL",   "10000"))
 RISK_PER_TRADE  = float(os.getenv("RISK_PER_TRADE",  "0.02"))
-STOP_LOSS_ATR   = 1.5
+STOP_LOSS_ATR   = 1.2
 TAKE_PROFIT_R   = 2.0
-MAX_OPEN_TRADES        = 5
+MAX_OPEN_TRADES        = 8
 MAX_POSITION_SIZE_PCT  = 0.50  # Máximo 50% del capital por trade
 
 # ── Scoring ───────────────────────────────────────────────────────────────────
-MIN_SCORE_TO_TRADE = float(os.getenv("MIN_SCORE_TO_TRADE", "6.0"))
+MIN_SCORE_TO_TRADE = float(os.getenv("MIN_SCORE_TO_TRADE", "5.0"))
 MIN_SCORE_ALERT    = 5.0
 
 # ── Exchange (Binance API) ──────────────────────────────────────────────────

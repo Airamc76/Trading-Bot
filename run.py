@@ -63,14 +63,11 @@ def send_telegram(message: str):
 
 
 def run_cycle(dry_run: bool = False):
+    initialize_database()
     start = datetime.now(timezone.utc)
     logger.info(f"{'─'*55}")
     logger.info(f"🔄 Ciclo — {start.strftime('%Y-%m-%d %H:%M UTC')}")
     log_heartbeat("RUNNING", f"Iniciando ciclo en {start.strftime('%H:%M')}")
-    logger.info(f"   Pares: {', '.join(config.ALL_PAIRS)}")
-    logger.info(f"   DB:    {'Turso ☁️' if config.USE_TURSO else 'SQLite local'}")
-
-    initialize_database()
     broker = PaperBroker()
 
     # ── Descargar datos ───────────────────────────────────────────

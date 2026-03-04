@@ -1,0 +1,26 @@
+2026-03-04 16:40:18,730 [INFO] TradingBot — ───────────────────────────────────────────────────────
+2026-03-04 16:40:18,738 [INFO] TradingBot — 🔄 Ciclo — 2026-03-04 19:40 UTC
+2026-03-04 16:40:55,539 [INFO] database — ✅ SQLite local inicializado
+2026-03-04 16:40:55,545 [INFO] TradingBot — ───────────────────────────────────────────────────────
+2026-03-04 16:40:55,553 [INFO] TradingBot — 🔄 Ciclo — 2026-03-04 19:40 UTC
+2026-03-04 16:40:55,596 [INFO] paper_broker — 💼 Balance: $10,000.00
+2026-03-04 16:40:55,602 [INFO] TradingBot — 📡 Obteniendo sentimiento y contexto macro...
+2026-03-04 16:40:56,887 [INFO] news_scraper — 📊 Sentimiento detectado -> CRYPTO: 0.32, FOREX: -0.06
+2026-03-04 16:40:58,943 [INFO] macro_analyzer — 🌍 Macro: DXY NEUTRAL | Nasdaq UP | Risk: NEUTRAL
+2026-03-04 16:40:58,958 [INFO] TradingBot — 📡 Descargando datos de mercado...
+2026-03-04 16:40:58,964 [INFO] fetcher — 📡 Cargando BTC/USDT...
+2026-03-04 16:41:04,463 [INFO] fetcher — 📡 Cargando ETH/USDT...
+2026-03-04 16:41:08,878 [INFO] fetcher — 📡 Cargando SOL/USDT...
+2026-03-04 16:41:13,508 [INFO] fetcher — 📡 Cargando EURUSD=X...
+2026-03-04 16:41:14,830 [ERROR] yfinance — $EURUSD=X: possibly delisted; no price data found  (period=1y) (Yahoo error = "15m data not available for startTime=1741117275 and endTime=1772653275. The requested range must be within the last 60 days.")
+2026-03-04 16:41:14,841 [INFO] fetcher — 📡 Cargando GBPUSD=X...
+2026-03-04 16:41:16,049 [ERROR] yfinance — $GBPUSD=X: possibly delisted; no price data found  (period=1y) (Yahoo error = "15m data not available for startTime=1741117276 and endTime=1772653276. The requested range must be within the last 60 days.")
+2026-03-04 16:41:16,083 [INFO] fetcher — 📡 Cargando USDJPY=X...
+2026-03-04 16:41:17,056 [ERROR] yfinance — $USDJPY=X: possibly delisted; no price data found  (period=1y) (Yahoo error = "15m data not available for startTime=1741117277 and endTime=1772653277. The requested range must be within the last 60 days.")
+2026-03-04 16:41:17,088 [INFO] TradingBot — ✅ 3/6 pares obtenidos
+2026-03-04 16:41:24,221 [INFO] TradingBot — 🟢 BTC/USDT (15m) | Score: 5.0 | Precio: 7.38e+04 | Tendencia alcista (Precio > EMA200) | Sentimiento alcista (0.32) | Macro: Nasdaq en tendencia alcista
+2026-03-04 16:41:24,285 [INFO] TradingBot — 🟢 ETH/USDT (15m) | Score: 5.0 | Precio: 2184 | Tendencia alcista (Precio > EMA200) | Sentimiento alcista (0.32) | Macro: Nasdaq en tendencia alcista
+2026-03-04 16:41:24,326 [INFO] TradingBot — 🟢 SOL/USDT (15m) | Score: 5.0 | Precio: 93.41 | Tendencia alcista (Precio > EMA200) | Sentimiento alcista (0.32) | Macro: Nasdaq en tendencia alcista
+2026-03-04 16:41:24,358 [INFO] paper_broker — 📈 #1 BTC/USDT BUY @ 7.38e+04 | SL=7.325e+04 TP=7.491e+04 | $5,000
+2026-03-04 16:41:24,390 [INFO] paper_broker — 📈 #2 ETH/USDT BUY @ 2184 | SL=2163 TP=2227 | $5,000
+2026-03-04 16:41:24,413 [INFO] paper_broker — 📈 #3 SOL/USDT BUY @ 93.41 | SL=92.46 TP=95.32 | $5,000
