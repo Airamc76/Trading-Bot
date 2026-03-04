@@ -47,6 +47,10 @@ MAX_POSITION_SIZE_PCT  = 0.50  # Máximo 50% del capital por trade
 MIN_SCORE_TO_TRADE = float(os.getenv("MIN_SCORE_TO_TRADE", "6.0"))
 MIN_SCORE_ALERT    = 5.0
 
+# ── Exchange (Binance API) ──────────────────────────────────────────────────
+BINANCE_API_KEY    = os.getenv("BINANCE_API_KEY",    "")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+
 # ── Notificaciones (Telegram opcional) ───────────────────────────────────────
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.getenv("TELEGRAM_CHAT_ID",   "")

@@ -3,6 +3,7 @@ import ccxt
 import yfinance as yf
 import logging
 from datetime import datetime
+import config
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,11 @@ def fetch_cryptocompare_data(pair, timeframe, limit=100):
 def fetch_crypto_data(pair, timeframe, limit=200):
     """Obtiene datos de Crypto usando CCXT (Binance) con fallbacks inteligentes"""
     try:
-        exchange = ccxt.binance()
+        exchange = ccxt.binance({
+            'apiKey': config.BINANCE_API_KEY,
+            'secret': config.BINANCE_API_SECRET,
+            'enableRateLimit': True,
+        })
         ohlcv = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
         df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
         df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
