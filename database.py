@@ -368,7 +368,7 @@ def save_portfolio_snapshot(balance: float, equity: float, note: str = ""):
     update_portfolio(balance, equity, note)
 
 
-def dataframe_to_db_records(df):
+def df_to_records(df):
     """Convierte un DataFrame de pandas a lista de diccionarios para DB."""
     if df is None or df.empty:
         return []

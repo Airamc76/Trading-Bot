@@ -15,14 +15,27 @@ def get_macro_context():
         if dxy.empty or nasdaq.empty:
             return None
 
-        dxy_change = ((dxy['Close'].iloc[-1] - dxy['Close'].iloc[0]) / dxy['Close'].iloc[0]) * 100
-        nas_change = ((nasdaq['Close'].iloc[-1] - nasdaq['Close'].iloc[0]) / nasdaq['Close'].iloc[0]) * 100
+        # Seleccionar Close de forma robusta (yfinance puede devolver MultiIndex)
+        dxy_close = dxy['Close']
+        nas_close = nasdaq['Close']
+        
+        # Si es un DataFrame (ej. MultiIndex), tomamos la primera columna
+        if hasattr(dxy_close, 'columns'): dxy_close = dxy_close.iloc[:, 0]
+        if hasattr(nas_close, 'columns'): nas_close = nas_close.iloc[:, 0]
+
+        dxy_start = float(dxy_close.iloc[0])
+        dxy_end   = float(dxy_close.iloc[-1])
+        nas_start = float(nas_close.iloc[0])
+        nas_end   = float(nas_close.iloc[-1])
+
+        dxy_change = ((dxy_end - dxy_start) / dxy_start) * 100
+        nas_change = ((nas_end - nas_start) / nas_start) * 100
 
         context = {
             "dxy_trend": "UP" if dxy_change > 0.1 else "DOWN" if dxy_change < -0.1 else "NEUTRAL",
             "nasdaq_trend": "UP" if nas_change > 0.1 else "DOWN" if nas_change < -0.1 else "NEUTRAL",
-            "dxy_val": float(dxy['Close'].iloc[-1]),
-            "nasdaq_val": float(nasdaq['Close'].iloc[-1]),
+            "dxy_val": dxy_end,
+            "nasdaq_val": nas_end,
             "risk_appetite": "HIGH" if nas_change > 0 and dxy_change < 0 else "LOW" if nas_change < 0 and dxy_change > 0 else "NEUTRAL"
         }
         
