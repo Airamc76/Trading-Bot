@@ -7,7 +7,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 def fetch_crypto_data(pair, timeframe, limit=200):
-    """Obtiene datos de Crypto usando CCXT (Binance)"""
+    """Obtiene datos de Crypto usando CCXT (Binance) con fallback a yfinance si hay geobloqueo"""
     try:
         exchange = ccxt.binance()
         ohlcv = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
@@ -15,8 +15,11 @@ def fetch_crypto_data(pair, timeframe, limit=200):
         df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
         return df
     except Exception as e:
-        logger.error(f"Error fetching crypto {pair}: {e}")
-        return None
+        logger.warning(f"Binance block or error for {pair}: {e}. Intentando fallback con yfinance...")
+        # Fallback a yfinance para evitar geobloqueo en GHA
+        # Convertir 'BTC/USDT' -> 'BTC-USD'
+        yf_symbol = pair.replace("/", "-").replace("USDT", "USD")
+        return fetch_forex_data(yf_symbol, timeframe, limit)
 
 def fetch_forex_data(pair, timeframe, limit=200):
     """Obtiene datos de Forex usando yfinance"""

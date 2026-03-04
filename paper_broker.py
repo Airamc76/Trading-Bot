@@ -2,7 +2,7 @@
 paper_broker.py — Broker simulado para paper trading
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import config
 from database import (get_portfolio_balance, update_portfolio,
                        get_open_trades, open_paper_trade, close_paper_trade)
@@ -40,7 +40,7 @@ class PaperBroker:
         size = self._position_size(price, stop_loss)
         tid = open_paper_trade({
             "signal_id": signal_id, "pair": pair, "direction": direction,
-            "open_time": datetime.utcnow().isoformat(), "open_price": price,
+            "open_time": datetime.now(timezone.utc).isoformat(), "open_price": price,
             "stop_loss": stop_loss, "take_profit": take_profit,
             "position_size": round(size, 2),
         })

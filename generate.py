@@ -5,7 +5,7 @@ GitHub Pages publica este archivo automáticamente.
 import sys
 import json
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Sin subcarpetas — todo en la raíz
 from database import initialize_database, get_dashboard_data
@@ -27,7 +27,7 @@ def generate():
 
 
 def build_html(data_json: str) -> str:
-    now = datetime.utcnow().strftime("%d %b %Y %H:%M UTC")
+    now = datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>

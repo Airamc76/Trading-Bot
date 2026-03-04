@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Setup
 Path("logs").mkdir(exist_ok=True)
@@ -46,7 +46,7 @@ def send_telegram(message: str):
 
 
 def run_cycle(dry_run: bool = False):
-    start = datetime.utcnow()
+    start = datetime.now(timezone.utc)
     logger.info(f"{'─'*55}")
     logger.info(f"🔄 Ciclo — {start.strftime('%Y-%m-%d %H:%M UTC')}")
     logger.info(f"   Pares: {', '.join(config.ALL_PAIRS)}")
@@ -80,7 +80,7 @@ def run_cycle(dry_run: bool = False):
         signal.update({
             "pair":      pair,
             "timeframe": config.PRIMARY_TIMEFRAME,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "price":     vals["price"],
         })
         all_signals.append(signal)
@@ -138,7 +138,7 @@ def run_cycle(dry_run: bool = False):
 
     # ── Resumen del ciclo ─────────────────────────────────────────
     stats   = broker.stats()
-    elapsed = (datetime.utcnow() - start).total_seconds()
+    elapsed = (datetime.now(timezone.utc) - start).total_seconds()
 
     print(f"\n{'─'*55}")
     print(f"{'Par':15s} {'Dir':6s} {'Score':8s} {'Precio':>14s}")

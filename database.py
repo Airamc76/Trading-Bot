@@ -6,7 +6,7 @@ import os
 import json
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -228,7 +228,7 @@ def close_paper_trade(trade_id: int, close_price: float, reason: str) -> float:
         pnl = -pnl
     pnl_pct = pnl / float(t["position_size"]) * 100
     status  = "WIN" if pnl > 0 else "LOSS"
-    now     = datetime.utcnow().isoformat()
+    now     = datetime.now(timezone.utc).isoformat()
     d.execute(
         "UPDATE paper_trades SET close_time=?,close_price=?,pnl=?,pnl_pct=?,status=?,close_reason=? WHERE id=?",
         [now, close_price, round(pnl, 2), round(pnl_pct, 2), status, reason, trade_id]
@@ -250,7 +250,7 @@ def update_portfolio(balance: float, equity: float, note: str = ""):
     d = db()
     d.execute(
         "INSERT INTO portfolio (timestamp,balance,equity,note) VALUES (?,?,?,?)",
-        [datetime.utcnow().isoformat(), balance, equity, note]
+        [datetime.now(timezone.utc).isoformat(), balance, equity, note]
     )
     d.commit()
 
@@ -281,5 +281,5 @@ def get_dashboard_data() -> dict:
         "signals":         signals,
         "trades":          trades,
         "balance_history": list(reversed(bal_hist)),
-        "last_updated":    datetime.utcnow().isoformat(),
+        "last_updated":    datetime.now(timezone.utc).isoformat(),
     }
