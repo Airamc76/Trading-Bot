@@ -6,8 +6,26 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+def fetch_cryptocompare_data(pair, timeframe, limit=100):
+    """Fallback usando la API pública de CryptoCompare"""
+    try:
+        import requests
+        # Convertir 'BTC/USDT' -> 'BTC', 'USDT'
+        fsym, tsym = pair.split("/")
+        url = f"https://min-api.cryptocompare.com/data/v2/histo{'hour' if timeframe == '1h' else 'day'}?fsym={fsym}&tsym={tsym}&limit={limit}"
+        res = requests.get(url, timeout=10).json()
+        if res.get("Response") == "Success":
+            data = res["Data"]["Data"]
+            df = pd.DataFrame(data)
+            df['datetime'] = pd.to_datetime(df['time'], unit='s')
+            df['timestamp'] = df['time'] * 1000
+            df = df.rename(columns={'volumefrom': 'volume'})
+            return df[['timestamp', 'datetime', 'open', 'high', 'low', 'close', 'volume']]
+    except: pass
+    return None
+
 def fetch_crypto_data(pair, timeframe, limit=200):
-    """Obtiene datos de Crypto usando CCXT (Binance) con fallback inteligente"""
+    """Obtiene datos de Crypto usando CCXT (Binance) con fallbacks inteligentes"""
     try:
         exchange = ccxt.binance()
         ohlcv = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
@@ -16,13 +34,18 @@ def fetch_crypto_data(pair, timeframe, limit=200):
         return df
     except Exception as e:
         msg = str(e)
-        # 451 es el código de error para restricciones geográficas (común en GitHub Actions)
         if "451" in msg or "restricted location" in msg.lower():
-            logger.info(f"ℹ️ {pair}: Región restringida para Binance. Usando Yahoo Finance...")
+            logger.info(f"ℹ️ {pair}: Región restringida para Binance. Intentando CryptoCompare...")
         else:
-            logger.warning(f"⚠️ Error en Binance para {pair}: {e}. Intentando Yahoo Finance...")
+            logger.warning(f"⚠️ Error en Binance para {pair}: {e}. Intentando CryptoCompare...")
             
-        # Fallback a yfinance
+        # Fallback 1: CryptoCompare
+        df_cc = fetch_cryptocompare_data(pair, timeframe, limit)
+        if df_cc is not None:
+             return df_cc
+             
+        # Fallback 2: yfinance (último recurso)
+        logger.info(f"ℹ️ {pair}: Usando Yahoo Finance como último recurso...")
         yf_symbol = pair.replace("/", "-").replace("USDT", "USD")
         return fetch_forex_data(yf_symbol, timeframe, limit)
 
