@@ -35,7 +35,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-          cache: 'pip'
+      
+      - name: 🔍 Debug Info
+        run: |
+          python --version
+          pip --version
+          ls -R
 
       - name: 📦 Instalar dependencias
         run: pip install -r requirements.txt
