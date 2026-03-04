@@ -24,13 +24,19 @@ logger = logging.getLogger("TradingBot")
 
 # Imports — todos en la raíz
 import config
-from database import initialize_database, save_prices, save_signal
-from fetcher import fetch_all_pairs, dataframe_to_db_records
+from database import (
+    initialize_database, save_prices, save_signal,
+    get_latest_signals, get_open_trades, close_paper_trade,
+    save_portfolio_snapshot, dataframe_to_db_records,
+    save_macro_context
+)
+from fetcher import fetch_all_pairs
 from indicators import calculate_all, get_latest_values
 from signals import score_signal, format_signal_summary
 from paper_broker import PaperBroker
 from news_scraper import get_market_sentiment
 from feedback_engine import run_feedback_cycle
+from macro_analyzer import get_macro_context, is_high_impact_event_near
 
 
 def send_telegram(message: str):
@@ -58,8 +64,18 @@ def run_cycle(dry_run: bool = False):
     broker = PaperBroker()
 
     # ── Descargar datos ───────────────────────────────────────────
-    logger.info("📡 Scrapeando noticias y sentimiento...")
-    sentiments = get_market_sentiment()
+    # ── 3. Obtener Sentimiento y Macro ────────────────────────────
+    logger.info("📡 Obteniendo sentimiento y contexto macro...")
+    sentiment = get_market_sentiment()
+    macro = get_macro_context()
+    event_near = is_high_impact_event_near()
+
+    if macro:
+        save_macro_context(macro)
+
+    if event_near:
+        logger.warning("⚠️ EVENTO DE ALTO IMPACTO CERCA. Pausando nuevas operaciones.")
+        send_telegram("⚠️ <b>Precaución</b>: Evento macro de alto impacto detectado. Pausando nuevas entradas.")
     
     logger.info("📡 Descargando datos de mercado...")
     market_data = fetch_all_pairs(config.ALL_PAIRS, config.PRIMARY_TIMEFRAME, 200)
@@ -81,11 +97,11 @@ def run_cycle(dry_run: bool = False):
         vals   = get_latest_values(df_ind)
         current_prices[pair] = vals["price"]
 
-        # Determinar sentimiento según el tipo de par
-        is_crypto = "/" in pair and any(c in pair for c in ["BTC", "ETH", "SOL", "USDT"])
-        sentiment_score = sentiments["CRYPTO"] if is_crypto else sentiments["FOREX"]
+        # Obtener sentimiento por categoría
+        sent_score = sentiment.get("CRYPTO" if pair in config.CRYPTO_PAIRS else "FOREX", 0.0)
 
-        signal = score_signal(vals, config, sentiment_score=sentiment_score)
+        # Scoring avanzado (Técnico + Sentimiento + Macro)
+        signal = score_signal(vals, config, sent_score, macro)
         signal.update({
             "pair":      pair,
             "timeframe": config.PRIMARY_TIMEFRAME,
@@ -108,7 +124,7 @@ def run_cycle(dry_run: bool = False):
         run_feedback_cycle()
 
     # ── Abrir nuevos trades ───────────────────────────────────────
-    if not dry_run:
+    if not dry_run and not event_near:
         tradeable = sorted(
             [s for s in all_signals
              if s["score"] >= config.MIN_SCORE_TO_TRADE

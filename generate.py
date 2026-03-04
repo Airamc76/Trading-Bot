@@ -149,6 +149,19 @@ footer span{{color:var(--cyan)}}
 .lts{{color:var(--muted);font-size:9px;margin-bottom:4px;display:flex;justify-content:space-between}}
 .ltext{{line-height:1.4;color:#eee}}
 .lscore{{color:var(--gold);font-weight:700}}
+
+/* MACRO */
+.mitem{{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}}
+.mitem:last-child{{border-bottom:none}}
+.mval{{font-family:var(--mono);font-size:12px;font-weight:700}}
+.mbadge{{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:8px}}
+.mUP{{color:var(--green);border:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05)}}
+.mDOWN{{color:var(--red);border:1px solid rgba(255,59,92,.2);background:rgba(255,59,92,.05)}}
+.mNEUTRAL{{color:var(--muted);border:1px solid var(--border);background:rgba(61,90,122,.1)}}
+.risk-box{{text-align:center;padding:15px;border-radius:8px;margin-top:10px;font-weight:800;letter-spacing:1px;font-size:14px}}
+.rHIGH{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid var(--green)}}
+.rLOW{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}}
+.rNEUTRAL{{background:var(--s1);color:var(--muted);border:1px solid var(--border)}}
 </style>
 </head>
 <body>
@@ -203,6 +216,10 @@ footer span{{color:var(--cyan)}}
   <div class="panel">
     <div class="ph"><span>🧠</span><span class="phtitle">Diario de Aprendizaje</span><span class="phsub">Feedback Engine</span></div>
     <div class="pb"><div id="lessonFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
+    <div class="pb" id="macroBox"></div>
   </div>
 </div>
 

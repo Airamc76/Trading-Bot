@@ -60,12 +60,17 @@ CREATE TABLE IF NOT EXISTS monthly_metrics (
     max_drawdown   REAL, sharpe_ratio REAL,
     best_pair TEXT, worst_pair TEXT, notes TEXT
 );
-CREATE TABLE IF NOT EXISTS trade_feedback (
-    id             INTEGER PRIMARY KEY AUTOINCREMENT,
-    trade_id       INTEGER UNIQUE,
-    lesson         TEXT,
     performance_score REAL,
     timestamp      TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS macro_history (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT,
+    dxy_val        REAL,
+    nasdaq_val     REAL,
+    risk_appetite  TEXT,
+    dxy_trend      TEXT,
+    nasdaq_trend   TEXT
 );
 """
 
@@ -195,6 +200,19 @@ def save_prices(records: list):
     d.commit()
 
 
+def save_macro_context(ctx: dict):
+    if not ctx: return
+    d = db()
+    sql = "INSERT INTO macro_history (timestamp, dxy_val, nasdaq_val, risk_appetite, dxy_trend, nasdaq_trend) VALUES (?, ?, ?, ?, ?, ?)"
+    params = [datetime.now(timezone.utc).isoformat(), ctx['dxy_val'], ctx['nasdaq_val'], ctx['risk_appetite'], ctx['dxy_trend'], ctx['nasdaq_trend']]
+    d.execute(sql, params)
+    d.commit()
+
+def get_latest_macro():
+    d = db()
+    r = d.query("SELECT * FROM macro_history ORDER BY id DESC LIMIT 1")
+    return r[0] if r else None
+
 def save_signal(signal: dict) -> int:
     reasons = signal.get("reasons", [])
     if isinstance(reasons, list):
@@ -285,6 +303,7 @@ def get_dashboard_data() -> dict:
     # Join paper_trades with trade_feedback
     trades  = d.query("SELECT t.*, f.lesson, f.performance_score FROM paper_trades t LEFT JOIN trade_feedback f ON t.id = f.trade_id ORDER BY t.id DESC LIMIT 30")
     bal_hist= d.query("SELECT timestamp,balance FROM portfolio ORDER BY id DESC LIMIT 60")
+    macro   = get_latest_macro()
 
     balance = float(bal_r[0]["balance"]) if bal_r else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
@@ -300,5 +319,6 @@ def get_dashboard_data() -> dict:
         "signals":         signals,
         "trades":          trades,
         "balance_history": list(reversed(bal_hist)),
+        "macro":           macro,
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }

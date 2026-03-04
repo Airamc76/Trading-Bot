@@ -1,9 +1,10 @@
 from datetime import datetime
 
-def score_signal(vals, config, sentiment_score=0.0):
+def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
     """
     Evalúa los indicadores y devuelve un score de 0 a 10 y una dirección.
     sentiment_score: float entre -1 (muy negativo) y 1 (muy positivo).
+    macro_context: dict con tendencias de DXY y Nasdaq.
     """
     score = 0
     reasons = []
@@ -55,6 +56,15 @@ def score_signal(vals, config, sentiment_score=0.0):
         buy_score += 3
         buy_reasons.append({"note": f"Sentimiento MUY alcista detectado ({sentiment_score:.2f})"})
 
+    # 2.6 Contexto Macro (Confluencia Global)
+    if macro_context:
+        if macro_context.get("risk_appetite") == "HIGH":
+            buy_score += 1
+            buy_reasons.append({"note": "Macro: Apetito por el riesgo ALTO (Nasdaq ▲ / DXY ▼)"})
+        if macro_context.get("nasdaq_trend") == "UP":
+            buy_score += 1
+            buy_reasons.append({"note": "Macro: Nasdaq en tendencia alcista"})
+
     # 3. Análisis para VENTA
     sell_score = 0
     sell_reasons = []
@@ -85,6 +95,15 @@ def score_signal(vals, config, sentiment_score=0.0):
     elif sentiment_score < -0.5:
         sell_score += 3
         sell_reasons.append({"note": f"Sentimiento MUY bajista detectado ({sentiment_score:.2f})"})
+
+    # 3.6 Contexto Macro (Confluencia Global)
+    if macro_context:
+        if macro_context.get("risk_appetite") == "LOW":
+            sell_score += 1
+            sell_reasons.append({"note": "Macro: Apetito por el riesgo BAJO (Nasdaq ▼ / DXY ▲)"})
+        if macro_context.get("dxy_trend") == "UP":
+            sell_score += 1
+            sell_reasons.append({"note": "Macro: Dólar fuerte (DXY ▲)"})
 
     # Determinar dirección final
     if buy_score >= sell_score and buy_score >= 5:
