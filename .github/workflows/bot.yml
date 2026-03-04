@@ -6,9 +6,10 @@
 name: 🤖 Trading Bot
 
 on:
+  push:
+    branches: [ main, master ]
   schedule:
     - cron: '*/15 * * * *'
-
   workflow_dispatch:
     inputs:
       mode:
