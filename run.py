@@ -12,12 +12,21 @@ from datetime import datetime, timezone
 
 # Setup
 Path("logs").mkdir(exist_ok=True)
+# ── Configuración de Log ──────────────────────────────────────
+class DBLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            from database import log_system_event
+            log_system_event(record.levelname, record.getMessage())
+        except: pass
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
     handlers=[
         logging.StreamHandler(sys.stdout),
         logging.FileHandler("logs/bot.log", encoding="utf-8"),
+        DBLogHandler()
     ]
 )
 logger = logging.getLogger("TradingBot")

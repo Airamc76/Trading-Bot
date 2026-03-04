@@ -60,8 +60,24 @@ CREATE TABLE IF NOT EXISTS monthly_metrics (
     max_drawdown   REAL, sharpe_ratio REAL,
     best_pair TEXT, worst_pair TEXT, notes TEXT
 );
+CREATE TABLE IF NOT EXISTS trade_feedback (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_id       INTEGER UNIQUE,
+    lesson         TEXT,
     performance_score REAL,
     timestamp      TEXT DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS hb_log (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT,
+    status         TEXT,
+    note           TEXT
+);
+CREATE TABLE IF NOT EXISTS system_logs (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT,
+    level          TEXT,
+    message        TEXT
 );
 CREATE TABLE IF NOT EXISTS macro_history (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
