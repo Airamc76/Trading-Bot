@@ -222,6 +222,15 @@ def log_heartbeat(status: str, note: str = ""):
 def get_recent_heartbeats(limit=5):
     return db().query("SELECT * FROM hb_log ORDER BY id DESC LIMIT ?", [limit])
 
+def log_system_event(level: str, message: str):
+    d = db()
+    d.execute("INSERT INTO system_logs (timestamp, level, message) VALUES (?,?,?)",
+              [datetime.now(timezone.utc).isoformat(), level, message])
+    d.commit()
+
+def get_recent_logs(limit=15):
+    return db().query("SELECT * FROM system_logs ORDER BY id DESC LIMIT ?", [limit])
+
 def save_signal(signal: dict) -> int:
     reasons = signal.get("reasons", [])
     if isinstance(reasons, list):
@@ -330,5 +339,6 @@ def get_dashboard_data() -> dict:
         "balance_history": list(reversed(bal_hist)),
         "macro":           macro,
         "heartbeats":      get_recent_heartbeats(),
+        "system_logs":     get_recent_logs(),
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }

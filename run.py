@@ -28,7 +28,7 @@ from database import (
     initialize_database, save_prices, save_signal,
     get_latest_signals, get_open_trades, close_paper_trade,
     save_portfolio_snapshot, dataframe_to_db_records,
-    save_macro_context, log_heartbeat
+    save_macro_context, log_heartbeat, log_system_event
 )
 from fetcher import fetch_all_pairs
 from indicators import calculate_all, get_latest_values

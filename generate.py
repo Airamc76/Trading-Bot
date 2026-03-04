@@ -170,6 +170,16 @@ footer span{{color:var(--cyan)}}
 .pSUCCESS{{background:var(--green);box-shadow:0 0 5px var(--green)}}
 .pRUNNING{{background:var(--gold);box-shadow:0 0 5px var(--gold);animation: blink 1s infinite}}
 @keyframes blink {{ 0%{{opacity:1}} 50%{{opacity:0.3}} 100%{{opacity:1}} }}
+
+/* LOGS */
+.log-container{{font-family:var(--mono);font-size:10px;height:300px;overflow-y:auto;background:var(--s1);padding:10px;border:1px solid var(--border)}}
+.log-line{{margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex}}
+.log-ts{{color:var(--muted);min-width:70px}}
+.log-lvl{{width:45px;font-weight:700;margin-right:8px}}
+.l-INFO{{color:var(--cyan)}}
+.l-WARNING{{color:var(--gold)}}
+.l-ERROR{{color:var(--red)}}
+.log-msg{{color:rgba(255,255,255,0.85)}}
 </style>
 </head>
 <body>
@@ -232,6 +242,10 @@ footer span{{color:var(--cyan)}}
   <div class="panel">
     <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Activity Heartbeat</span></div>
     <div class="pb" id="pulseBox"></div>
+  </div>
+  <div class="panel" style="grid-column: span 2">
+    <div class="ph"><span>📠</span><span class="phtitle">Registro de Actividad</span><span class="phsub">Live Console Logs</span></div>
+    <div class="pb"><div class="log-container" id="logBox"></div></div>
   </div>
 </div>
 
@@ -317,6 +331,57 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
     <div class="litem">
       <div class="lts"><span>${{fd(x.open_time)}} — ${{x.pair}}</span><span class="lscore">${{f(x.performance_score,1)}}/10</span></div>
       <div class="ltext">${{x.lesson}}</div>
+    </div>
+  `).join('');
+}})();
+
+// Macro
+(()=>{{
+  const el=document.getElementById('macroBox'), m=D.macro;
+  if(!m){{el.innerHTML='<div class="empty"><div class="empty-icon">🌍</div><p>Sincronizando datos macro...</p></div>';return;}}
+  
+  el.innerHTML=`
+    <div class="mitem">
+      <div><div style="font-size:12px;font-weight:600">DXY (Dollar Index)</div><div style="font-size:10px;color:var(--muted)">Inversamente correlacionado</div></div>
+      <div class="mval">${{f(m.dxy_val)}} <span class="mbadge m${{m.dxy_trend}}">${{m.dxy_trend}}</span></div>
+    </div>
+    <div class="mitem">
+      <div><div style="font-size:12px;font-weight:600">Nasdaq 100</div><div style="font-size:10px;color:var(--muted)">Correlación con riesgo</div></div>
+      <div class="mval">${{f(m.nasdaq_val,0)}} <span class="mbadge m${{m.nasdaq_trend}}">${{m.nasdaq_trend}}</span></div>
+    </div>
+    <div class="risk-box r${{m.risk_appetite}}">
+      APETITO POR EL RIESGO: ${{m.risk_appetite}}
+    </div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:10px">
+      Sincronizado: ${{fd(m.timestamp)}}
+    </div>
+  `;
+}})();
+
+// Pulse
+(()=>{{
+  const el=document.getElementById('pulseBox'), hb=D.heartbeats||[];
+  if(!hb.length){{el.innerHTML='<div class="empty">Esperando pulso...</div>';return;}}
+  
+  el.innerHTML = hb.map(h => `
+    <div class="pulse-item">
+      <div><span class="pdot p${{h.status}}"></span><span style="font-weight:600">${{h.status}}</span></div>
+      <div style="color:var(--muted)">${{h.note}}</div>
+      <div style="font-family:var(--mono);opacity:0.8">${{fd(h.timestamp).split(',')[1]}}</div>
+    </div>
+  `).join('');
+}})();
+
+// Activity Logs
+(()=>{{
+  const el=document.getElementById('logBox'), logs=D.system_logs||[];
+  if(!logs.length){{el.innerHTML='<div class="empty">Esperando registros...</div>';return;}}
+  
+  el.innerHTML = logs.map(l => `
+    <div class="log-line">
+      <div class="log-ts">${{fd(l.timestamp).split(',')[1]}}</div>
+      <div class="log-lvl l-${{l.level}}">[${{l.level}}]</div>
+      <div class="log-msg">${{l.message}}</div>
     </div>
   `).join('');
 }})();
