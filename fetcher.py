@@ -37,7 +37,7 @@ def fetch_cryptocompare_data(pair, timeframe, limit=100):
     except: pass
     return None
 
-def fetch_crypto_data(pair, timeframe, limit=200):
+def fetch_crypto_data(pair, timeframe, limit=300):
     """Obtiene datos de Crypto usando CCXT (Binance) con fallbacks inteligentes"""
     try:
         exchange = ccxt.binance({
@@ -66,7 +66,7 @@ def fetch_crypto_data(pair, timeframe, limit=200):
         yf_symbol = pair.replace("/", "-").replace("USDT", "USD")
         return fetch_forex_data(yf_symbol, timeframe, limit)
 
-def fetch_forex_data(pair, timeframe, limit=200):
+def fetch_forex_data(pair, timeframe, limit=300):
     """Obtiene datos de Forex usando yfinance"""
     try:
         # yfinance usa intervalos como '1h', '1d', '15m'
@@ -105,7 +105,7 @@ def fetch_forex_data(pair, timeframe, limit=200):
         logger.error(f"Error fetching forex {pair}: {e}")
         return None
 
-def fetch_all_pairs(pairs, timeframe, limit=200):
+def fetch_all_pairs(pairs, timeframe, limit=300):
     """Punto de entrada para obtener todos los pares configurados"""
     results = {}
     for pair in pairs:

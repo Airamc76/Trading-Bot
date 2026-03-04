@@ -17,93 +17,101 @@ def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
     macd_hist = vals.get("macd_hist")
     bb_upper = vals.get("bb_upper")
     bb_lower = vals.get("bb_lower")
+    ema_9 = vals.get("ema_9")
+    ema_21 = vals.get("ema_21")
     atr = vals.get("atr", 0)
 
-    if not all([price, rsi, ema_20, ema_200]):
-        return {"direction": "NEUTRAL", "score": 0, "reasons": [{"note": "Faltan datos indicadores"}]}
-
-    # 1. Tendencia Principal (EMA 200)
-    trend = "UP" if price > ema_200 else "DOWN"
+    # REGLA FLEXIBLE: Si falta EMA200, usamos EMA50 como tendencia base
+    primary_trend_ma = ema_200 if ema_200 else ema_50
     
-    # 2. Análisis para COMPRA
+    if not all([price, rsi, primary_trend_ma]):
+        return {"direction": "NEUTRAL", "score": 0, "reasons": [{"note": "Faltan datos básicos de análisis"}]}
+
+    # 1. Análisis para COMPRA
     buy_score = 0
     buy_reasons = []
     
-    if price > ema_200:
+    # Tendencia
+    if price > primary_trend_ma:
         buy_score += 2
-        buy_reasons.append({"note": "Tendencia alcista (Precio > EMA200)"})
+        note = "Tendencia alcista (EMA200)" if ema_200 else "Tendencia alcista (EMA50 fallback)"
+        buy_reasons.append({"note": note})
         
+    # Scalping: EMA Cross
+    if ema_9 and ema_21 and ema_9 > ema_21:
+        buy_score += 1
+        buy_reasons.append({"note": "Scalping: EMA9 > EMA21"})
+
+    # RSI
     if rsi < 45:
         buy_score += 2
         buy_reasons.append({"note": f"RSI en zona baja ({rsi:.1f})"})
     if rsi < 35:
-        buy_score += 1 # Total +3 if < 35
+        buy_score += 1
         buy_reasons.append({"note": f"RSI Sobrevendido ({rsi:.1f})"})
         
+    # Impulso (Vela actual con fuerza)
+    prev_close = vals.get("open") # Aproximación de cambio en vela actual
+    if prev_close and price > prev_close * 1.002: # +0.2% en 15m es fuerza
+        buy_score += 1
+        buy_reasons.append({"note": "Fuerza alcista detectada"})
+
     if macd_hist and macd_hist > 0:
-        buy_score += 2
+        buy_score += 1
         buy_reasons.append({"note": "MACD Histograma positivo"})
         
     if bb_lower and price <= bb_lower * 1.01:
         buy_score += 2
         buy_reasons.append({"note": "Precio cerca de Banda Inferior BB"})
 
-    # 2.5 Sentimiento del mercado (Más sensible)
+    # Sentimiento y Macro (ya sensibles antes)
     if sentiment_score > 0.1:
         buy_score += 2
         buy_reasons.append({"note": f"Sentimiento alcista ({sentiment_score:.2f})"})
-    if sentiment_score > 0.4:
-        buy_score += 1 # Total +3 if > 0.4
-        buy_reasons.append({"note": f"Sentimiento MUY alcista ({sentiment_score:.2f})"})
+    
+    if macro_context and macro_context.get("nasdaq_trend") == "UP":
+        buy_score += 1
+        buy_reasons.append({"note": "Macro: Nasdaq alcista"})
 
-    # 2.6 Contexto Macro (Confluencia Global)
-    if macro_context:
-        if macro_context.get("risk_appetite") == "HIGH":
-            buy_score += 1
-            buy_reasons.append({"note": "Macro: Apetito por el riesgo ALTO (Nasdaq ▲ / DXY ▼)"})
-        if macro_context.get("nasdaq_trend") == "UP":
-            buy_score += 1
-            buy_reasons.append({"note": "Macro: Nasdaq en tendencia alcista"})
-
-    # 3. Análisis para VENTA
+    # 2. Análisis para VENTA
     sell_score = 0
     sell_reasons = []
     
-    if price < ema_200:
+    if price < primary_trend_ma:
         sell_score += 2
-        sell_reasons.append({"note": "Tendencia bajista (Precio < EMA200)"})
+        note = "Tendencia bajista (EMA200)" if ema_200 else "Tendencia bajista (EMA50 fallback)"
+        sell_reasons.append({"note": note})
+
+    if ema_9 and ema_21 and ema_9 < ema_21:
+        sell_score += 1
+        sell_reasons.append({"note": "Scalping: EMA9 < EMA21"})
         
-    if rsi > 60:
+    if rsi > 55:
         sell_score += 2
-        sell_reasons.append({"note": f"RSI en zona de distribución ({rsi:.1f})"})
-    elif rsi > 70:
-        sell_score += 3
+        sell_reasons.append({"note": f"RSI en zona alta ({rsi:.1f})"})
+    if rsi > 70:
+        sell_score += 1
         sell_reasons.append({"note": f"RSI Sobrecomprado ({rsi:.1f})"})
+
+    if prev_close and price < prev_close * 0.998:
+        sell_score += 1
+        sell_reasons.append({"note": "Fuerza bajista detectada"})
         
     if macd_hist and macd_hist < 0:
-        sell_score += 2
+        sell_score += 1
         sell_reasons.append({"note": "MACD Histograma negativo"})
         
     if bb_upper and price >= bb_upper * 0.99:
-        sell_score += 3
+        sell_score += 2
         sell_reasons.append({"note": "Precio cerca de Banda Superior BB"})
 
-    # 3.5 Sentimiento del mercado
-    if sentiment_score < -0.2:
+    if sentiment_score < -0.1:
         sell_score += 2
-        sell_reasons.append({"note": f"Sentimiento bajista detectado ({sentiment_score:.2f})"})
-    elif sentiment_score < -0.5:
-        sell_score += 3
-        sell_reasons.append({"note": f"Sentimiento MUY bajista detectado ({sentiment_score:.2f})"})
+        sell_reasons.append({"note": f"Sentimiento bajista ({sentiment_score:.2f})"})
 
-    # 3.6 Contexto Macro (Confluencia Global)
-    if macro_context:
-        if macro_context.get("risk_appetite") == "LOW":
-            sell_score += 1
-            sell_reasons.append({"note": "Macro: Apetito por el riesgo BAJO (Nasdaq ▼ / DXY ▲)"})
-        if macro_context.get("dxy_trend") == "UP":
-            sell_score += 1
-            sell_reasons.append({"note": "Macro: Dólar fuerte (DXY ▲)"})
+    if macro_context and macro_context.get("dxy_trend") == "UP":
+        sell_score += 1
+        sell_reasons.append({"note": "Macro: Dólar fuerte (DXY ▲)"})
 
     # Determinar dirección final
     if buy_score >= sell_score and buy_score >= 5:

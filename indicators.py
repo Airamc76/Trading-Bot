@@ -34,6 +34,8 @@ def calculate_all(df):
         })
         
     # EMAs
+    df['ema_9'] = ta.ema(df['close'], length=9)
+    df['ema_21'] = ta.ema(df['close'], length=21)
     df['ema_20'] = ta.ema(df['close'], length=20)
     df['ema_50'] = ta.ema(df['close'], length=50)
     df['ema_200'] = ta.ema(df['close'], length=200)
