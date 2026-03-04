@@ -172,14 +172,25 @@ footer span{{color:var(--cyan)}}
 @keyframes blink {{ 0%{{opacity:1}} 50%{{opacity:0.3}} 100%{{opacity:1}} }}
 
 /* LOGS */
-.log-container{{font-family:var(--mono);font-size:10px;height:300px;overflow-y:auto;background:var(--s1);padding:10px;border:1px solid var(--border)}}
-.log-line{{margin-bottom:4px;padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.03);display:flex}}
-.log-ts{{color:var(--muted);min-width:70px}}
-.log-lvl{{width:45px;font-weight:700;margin-right:8px}}
+.log-container{{
+  font-family:var(--mono);font-size:10px;height:340px;overflow-y:auto;
+  background:var(--s1);padding:12px;border:1px solid var(--border);
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}}
+.log-container::-webkit-scrollbar {{ width: 6px; }}
+.log-container::-webkit-scrollbar-track {{ background: transparent; }}
+.log-container::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 10px; }}
+
+.log-line{{
+  margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.02);
+  display:flex;line-height:1.5;
+}}
+.log-ts{{color:var(--muted);min-width:75px;flex-shrink:0}}
+.log-lvl{{width:48px;font-weight:700;margin-right:8px;flex-shrink:0}}
 .l-INFO{{color:var(--cyan)}}
 .l-WARNING{{color:var(--gold)}}
 .l-ERROR{{color:var(--red)}}
-.log-msg{{color:rgba(255,255,255,0.85)}}
+.log-msg{{color:rgba(255,255,255,0.9);word-break:break-word}}
 </style>
 </head>
 <body>

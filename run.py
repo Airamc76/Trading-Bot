@@ -120,8 +120,12 @@ def run_cycle(dry_run: bool = False):
         })
         all_signals.append(signal)
 
+        # Log de razonamiento para el dashboard
+        reasons_text = " | ".join([r["note"] for r in signal["reasons"]])
+        log_system_event("INFO", f"🔍 {pair}: Score {signal['score']:.1f}/10 - {reasons_text}")
+
         if signal["score"] >= config.MIN_SCORE_ALERT:
-            print(format_signal_summary(pair, config.PRIMARY_TIMEFRAME, signal, vals["price"]))
+            logger.info(format_signal_summary(pair, config.PRIMARY_TIMEFRAME, signal, vals["price"]))
 
     # ── Cerrar trades que tocaron SL/TP ──────────────────────────
     closed = broker.check_and_close_trades(current_prices)

@@ -7,7 +7,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 def fetch_crypto_data(pair, timeframe, limit=200):
-    """Obtiene datos de Crypto usando CCXT (Binance) con fallback a yfinance si hay geobloqueo"""
+    """Obtiene datos de Crypto usando CCXT (Binance) con fallback inteligente"""
     try:
         exchange = ccxt.binance()
         ohlcv = exchange.fetch_ohlcv(pair, timeframe, limit=limit)
@@ -15,9 +15,14 @@ def fetch_crypto_data(pair, timeframe, limit=200):
         df['datetime'] = pd.to_datetime(df['timestamp'], unit='ms')
         return df
     except Exception as e:
-        logger.warning(f"Binance block or error for {pair}: {e}. Intentando fallback con yfinance...")
-        # Fallback a yfinance para evitar geobloqueo en GHA
-        # Convertir 'BTC/USDT' -> 'BTC-USD'
+        msg = str(e)
+        # 451 es el código de error para restricciones geográficas (común en GitHub Actions)
+        if "451" in msg or "restricted location" in msg.lower():
+            logger.info(f"ℹ️ {pair}: Región restringida para Binance. Usando Yahoo Finance...")
+        else:
+            logger.warning(f"⚠️ Error en Binance para {pair}: {e}. Intentando Yahoo Finance...")
+            
+        # Fallback a yfinance
         yf_symbol = pair.replace("/", "-").replace("USDT", "USD")
         return fetch_forex_data(yf_symbol, timeframe, limit)
 
