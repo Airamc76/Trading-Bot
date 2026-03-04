@@ -27,7 +27,6 @@ def generate():
 
 
 def build_html(data_json: str) -> str:
-    now = datetime.now(timezone.utc).strftime("%d %b %Y %H:%M UTC")
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -158,7 +157,7 @@ footer span{{color:var(--cyan)}}
     </div>
   </div>
   <div class="hright">
-    <div class="hts">Actualizado: <span>{now}</span></div>
+    <div class="hts">Actualizado: <span id="lastUpdate">...</span></div>
     <div class="live">ACTIVO 24/7</div>
   </div>
 </header>
@@ -204,6 +203,9 @@ footer span{{color:var(--cyan)}}
 const D = {data_json};
 const f=(n,d=2)=>n==null?'—':Number(n).toLocaleString('es-AR',{{minimumFractionDigits:d,maximumFractionDigits:d}});
 const fd=ts=>{{if(!ts)return'—';try{{return new Date(ts).toLocaleString('es-AR',{{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}})}}catch{{return String(ts).slice(0,16)}}}};
+
+// Update header time
+document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 
 // KPIs
 (()=>{{
