@@ -29,6 +29,7 @@ from fetcher import fetch_all_pairs, dataframe_to_db_records
 from indicators import calculate_all, get_latest_values
 from signals import score_signal, format_signal_summary
 from paper_broker import PaperBroker
+from news_scraper import get_market_sentiment
 
 
 def send_telegram(message: str):
@@ -56,6 +57,9 @@ def run_cycle(dry_run: bool = False):
     broker = PaperBroker()
 
     # ── Descargar datos ───────────────────────────────────────────
+    logger.info("📡 Scrapeando noticias y sentimiento...")
+    sentiments = get_market_sentiment()
+    
     logger.info("📡 Descargando datos de mercado...")
     market_data = fetch_all_pairs(config.ALL_PAIRS, config.PRIMARY_TIMEFRAME, 200)
 
@@ -76,7 +80,11 @@ def run_cycle(dry_run: bool = False):
         vals   = get_latest_values(df_ind)
         current_prices[pair] = vals["price"]
 
-        signal = score_signal(vals, config)
+        # Determinar sentimiento según el tipo de par
+        is_crypto = "/" in pair and any(c in pair for c in ["BTC", "ETH", "SOL", "USDT"])
+        sentiment_score = sentiments["CRYPTO"] if is_crypto else sentiments["FOREX"]
+
+        signal = score_signal(vals, config, sentiment_score=sentiment_score)
         signal.update({
             "pair":      pair,
             "timeframe": config.PRIMARY_TIMEFRAME,

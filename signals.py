@@ -1,8 +1,9 @@
 from datetime import datetime
 
-def score_signal(vals, config):
+def score_signal(vals, config, sentiment_score=0.0):
     """
     Evalúa los indicadores y devuelve un score de 0 a 10 y una dirección.
+    sentiment_score: float entre -1 (muy negativo) y 1 (muy positivo).
     """
     score = 0
     reasons = []
@@ -46,6 +47,14 @@ def score_signal(vals, config):
         buy_score += 3
         buy_reasons.append({"note": "Precio cerca de Banda Inferior BB"})
 
+    # 2.5 Sentimiento del mercado
+    if sentiment_score > 0.2:
+        buy_score += 2
+        buy_reasons.append({"note": f"Sentimiento alcista detectado ({sentiment_score:.2f})"})
+    elif sentiment_score > 0.5:
+        buy_score += 3
+        buy_reasons.append({"note": f"Sentimiento MUY alcista detectado ({sentiment_score:.2f})"})
+
     # 3. Análisis para VENTA
     sell_score = 0
     sell_reasons = []
@@ -68,6 +77,14 @@ def score_signal(vals, config):
     if bb_upper and price >= bb_upper * 0.99:
         sell_score += 3
         sell_reasons.append({"note": "Precio cerca de Banda Superior BB"})
+
+    # 3.5 Sentimiento del mercado
+    if sentiment_score < -0.2:
+        sell_score += 2
+        sell_reasons.append({"note": f"Sentimiento bajista detectado ({sentiment_score:.2f})"})
+    elif sentiment_score < -0.5:
+        sell_score += 3
+        sell_reasons.append({"note": f"Sentimiento MUY bajista detectado ({sentiment_score:.2f})"})
 
     # Determinar dirección final
     if buy_score >= sell_score and buy_score >= 5:
