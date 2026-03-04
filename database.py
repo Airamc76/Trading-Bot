@@ -60,6 +60,13 @@ CREATE TABLE IF NOT EXISTS monthly_metrics (
     max_drawdown   REAL, sharpe_ratio REAL,
     best_pair TEXT, worst_pair TEXT, notes TEXT
 );
+CREATE TABLE IF NOT EXISTS trade_feedback (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_id       INTEGER UNIQUE,
+    lesson         TEXT,
+    performance_score REAL,
+    timestamp      TEXT DEFAULT (datetime('now'))
+);
 """
 
 
@@ -238,6 +245,16 @@ def close_paper_trade(trade_id: int, close_price: float, reason: str) -> float:
     return round(pnl, 2)
 
 
+def save_trade_feedback(trade_id: int, lesson: str, score: float):
+    d = db()
+    d.execute(
+        "INSERT OR REPLACE INTO trade_feedback (trade_id, lesson, performance_score) "
+        "VALUES (?,?,?)",
+        [trade_id, lesson, score]
+    )
+    d.commit()
+
+
 def get_open_trades() -> list:
     return db().query("SELECT * FROM paper_trades WHERE status='OPEN'")
 
@@ -265,7 +282,8 @@ def get_dashboard_data() -> dict:
     pnl_r  = d.query("SELECT COALESCE(SUM(pnl),0) as s FROM paper_trades WHERE status != 'OPEN'")[0]["s"] or 0
     bal_r  = d.query("SELECT balance FROM portfolio ORDER BY id DESC LIMIT 1")
     signals = d.query("SELECT pair,direction,score,price,timestamp,sentiment FROM signals ORDER BY id DESC LIMIT 20")
-    trades  = d.query("SELECT * FROM paper_trades ORDER BY id DESC LIMIT 30")
+    # Join paper_trades with trade_feedback
+    trades  = d.query("SELECT t.*, f.lesson, f.performance_score FROM paper_trades t LEFT JOIN trade_feedback f ON t.id = f.trade_id ORDER BY t.id DESC LIMIT 30")
     bal_hist= d.query("SELECT timestamp,balance FROM portfolio ORDER BY id DESC LIMIT 60")
 
     balance = float(bal_r[0]["balance"]) if bal_r else 10000.0

@@ -30,7 +30,9 @@ class PaperBroker:
         if not stop_loss or price == 0:
             return risk
         dist = abs(price - stop_loss) / price
-        return min(risk / dist if dist else risk, self.balance * 0.10)
+        max_size = self.balance * config.MAX_POSITION_SIZE_PCT
+        size = risk / dist if dist else risk
+        return min(size, max_size)
 
     def open_trade(self, signal_id, pair, direction, price, stop_loss, take_profit):
         if not self.can_open_trade():

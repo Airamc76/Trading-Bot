@@ -30,6 +30,7 @@ from indicators import calculate_all, get_latest_values
 from signals import score_signal, format_signal_summary
 from paper_broker import PaperBroker
 from news_scraper import get_market_sentiment
+from feedback_engine import run_feedback_cycle
 
 
 def send_telegram(message: str):
@@ -102,6 +103,9 @@ def run_cycle(dry_run: bool = False):
         emoji = "✅" if c["pnl"] > 0 else "❌"
         send_telegram(f"{emoji} <b>Trade cerrado</b>: {c['pair']}\n"
                       f"Razón: {c['reason']} | P&L: ${c['pnl']:+.2f}")
+
+    if closed:
+        run_feedback_cycle()
 
     # ── Abrir nuevos trades ───────────────────────────────────────
     if not dry_run:

@@ -143,6 +143,12 @@ tr:hover td{{background:rgba(0,229,255,.02)}}
 
 footer{{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--border);margin-top:20px}}
 footer span{{color:var(--cyan)}}
+/* LESSONS */
+.litem{{padding:12px;border-bottom:1px solid var(--border);font-size:11px}}
+.litem:last-child{{border-bottom:none}}
+.lts{{color:var(--muted);font-size:9px;margin-bottom:4px;display:flex;justify-content:space-between}}
+.ltext{{line-height:1.4;color:#eee}}
+.lscore{{color:var(--gold);font-weight:700}}
 </style>
 </head>
 <body>
@@ -193,6 +199,10 @@ footer span{{color:var(--cyan)}}
         <div class="ds" id="dstats"></div>
       </div>
     </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🧠</span><span class="phtitle">Diario de Aprendizaje</span><span class="phsub">Feedback Engine</span></div>
+    <div class="pb"><div id="lessonFeed"></div></div>
   </div>
 </div>
 
@@ -267,6 +277,19 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
     <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--red)"></div>Perdedores</div><div style="color:var(--red);font-family:var(--mono);font-weight:600">${{l}} (${{f(l/tot*100,1)}}%)</div></div>
     <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--cyan)"></div>Abiertos</div><div style="font-family:var(--mono);font-weight:600">${{D.open_trades}}</div></div>
   `;
+}})();
+
+// Lessons
+(()=>{{
+  const el=document.getElementById('lessonFeed'),t=D.trades||[];
+  const lessons = t.filter(x=>x.lesson);
+  if(!lessons.length){{el.innerHTML='<div class="empty"><div class="empty-icon">🧠</div><p>Esperando cierre de trades para generar aprendizaje...</p></div>';return;}}
+  el.innerHTML=lessons.slice(0,5).map(x=>`
+    <div class="litem">
+      <div class="lts"><span>${{fd(x.open_time)}} — ${{x.pair}}</span><span class="lscore">${{f(x.performance_score,1)}}/10</span></div>
+      <div class="ltext">${{x.lesson}}</div>
+    </div>
+  `).join('');
 }})();
 </script>
 </body></html>"""
