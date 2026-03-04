@@ -13,7 +13,19 @@ def fetch_cryptocompare_data(pair, timeframe, limit=100):
         import requests
         # Convertir 'BTC/USDT' -> 'BTC', 'USDT'
         fsym, tsym = pair.split("/")
-        url = f"https://min-api.cryptocompare.com/data/v2/histo{'hour' if timeframe == '1h' else 'day'}?fsym={fsym}&tsym={tsym}&limit={limit}"
+        
+        # Determinar endpoint y agregación
+        if timeframe == '1h':
+            endpoint = "histohour"
+            aggregate = 1
+        elif timeframe == '15m':
+            endpoint = "histominute"
+            aggregate = 15
+        else:
+            endpoint = "histoday"
+            aggregate = 1
+            
+        url = f"https://min-api.cryptocompare.com/data/v2/{endpoint}?fsym={fsym}&tsym={tsym}&limit={limit}&aggregate={aggregate}"
         res = requests.get(url, timeout=10).json()
         if res.get("Response") == "Success":
             data = res["Data"]["Data"]
@@ -57,14 +69,20 @@ def fetch_crypto_data(pair, timeframe, limit=200):
 def fetch_forex_data(pair, timeframe, limit=200):
     """Obtiene datos de Forex usando yfinance"""
     try:
-        # yfinance usa intervalos como '1h', '1d'
+        # yfinance usa intervalos como '1h', '1d', '15m'
         ticker = yf.Ticker(pair)
-        # Aproximamos el periodo basado en el limit y timeframe
-        # Para 1h y 200 bars, '15d' es suficiente
-        period = "1mo" if timeframe == "1h" else "1y"
+        # yahoo tiene límites: p. ej. 15m solo permite hasta 60 días
+        if timeframe in ["15m", "1h"]:
+            period = "1mo"
+        else:
+            period = "1y"
+        
         df = ticker.history(period=period, interval=timeframe)
         if df.empty:
-            return None
+            # Reintento con periodo más corto si falla
+            df = ticker.history(period="7d", interval=timeframe)
+            if df.empty:
+                return None
         
         df = df.reset_index()
         # Estandarizar nombres de columnas
