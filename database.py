@@ -343,13 +343,13 @@ def get_dashboard_data() -> dict:
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
 
     return {
-        "balance":         round(balance, 2),
+        "balance":         round(float(balance), 2),
         "total_pnl":       round(float(pnl_r), 2),
         "total_trades":    total,
         "wins":            wins,
         "losses":          losses,
         "open_trades":     open_t,
-        "win_rate":        round(wins / total * 100, 1) if total > 0 else 0.0,
+        "win_rate":        round(float(wins / total * 100), 1) if total > 0 else 0.0,
         "signals":         signals,
         "trades":          trades,
         "balance_history": list(reversed(bal_hist)),
@@ -358,3 +358,18 @@ def get_dashboard_data() -> dict:
         "system_logs":     get_recent_logs(),
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }
+
+
+def get_latest_signals(limit=10):
+    return db().query("SELECT * FROM signals ORDER BY id DESC LIMIT ?", [limit])
+
+
+def save_portfolio_snapshot(balance: float, equity: float, note: str = ""):
+    update_portfolio(balance, equity, note)
+
+
+def dataframe_to_db_records(df):
+    """Convierte un DataFrame de pandas a lista de diccionarios para DB."""
+    if df is None or df.empty:
+        return []
+    return df.reset_index().to_dict('records')
