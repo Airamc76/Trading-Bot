@@ -1,0 +1,63 @@
+# ================================================================
+#  .github/workflows/bot.yml
+#  GitHub Actions corre este workflow cada 15 minutos, 24/7.
+# ================================================================
+
+name: 🤖 Trading Bot
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Modo de ejecución'
+        required: false
+        default: 'cycle'
+        type: choice
+        options:
+          - cycle
+          - dry-run
+          - stats
+
+jobs:
+  run-bot:
+    name: Análisis y Paper Trading
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 📦 Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: 🤖 Ejecutar bot
+        env:
+          TURSO_URL:            ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN:     ${{ secrets.TURSO_AUTH_TOKEN }}
+          PAPER_CAPITAL:        ${{ secrets.PAPER_CAPITAL }}
+          RISK_PER_TRADE:       ${{ secrets.RISK_PER_TRADE }}
+          MIN_SCORE_TO_TRADE:   ${{ secrets.MIN_SCORE_TO_TRADE }}
+          CRYPTO_PAIRS:         ${{ secrets.CRYPTO_PAIRS }}
+          FOREX_PAIRS:          ${{ secrets.FOREX_PAIRS }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+          BOT_MODE:             ${{ github.event.inputs.mode || 'cycle' }}
+        run: python run.py
+
+      - name: 📊 Subir logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bot-logs-${{ github.run_number }}
+          path: logs/
+          retention-days: 7

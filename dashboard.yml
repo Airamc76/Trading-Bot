@@ -1,0 +1,60 @@
+# ================================================================
+#  .github/workflows/dashboard.yml
+#  Genera y publica el dashboard en GitHub Pages.
+# ================================================================
+
+name: 📊 Actualizar Dashboard
+
+on:
+  workflow_run:
+    workflows: ["🤖 Trading Bot"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-dashboard:
+    name: Generar dashboard estático
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: 📈 Generar HTML
+        env:
+          TURSO_URL:        ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: python generate.py
+
+      - name: 📤 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy-pages:
+    name: Deploy a GitHub Pages
+    needs: build-dashboard
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: 🚀 Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
