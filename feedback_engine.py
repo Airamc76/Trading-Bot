@@ -4,9 +4,9 @@ from database import save_trade_feedback, db
 logger = logging.getLogger(__name__)
 
 def analyze_closed_trade(trade):
-    \"\"\"
+    """
     Analiza un trade cerrado y genera una lección aprendida.
-    \"\"\"
+    """
     pnl = float(trade["pnl"])
     reason = trade["close_reason"]
     pair = trade["pair"]
@@ -32,9 +32,9 @@ def analyze_closed_trade(trade):
     logger.info(f"🧠 Feedback generado para #{trade['id']}: {lesson}")
 
 def run_feedback_cycle():
-    \"\"\"
+    """
     Busca trades recién cerrados sin feedback y los procesa.
-    \"\"\"
+    """
     d = db()
     # Buscamos trades cerrados que no estén en la tabla de feedback
     query = "SELECT t.* FROM paper_trades t LEFT JOIN trade_feedback f ON t.id = f.trade_id WHERE t.status IN ('WIN', 'LOSS') AND f.id IS NULL"
