@@ -1,7 +1,8 @@
 import logging
 import json
 from datetime import datetime, timezone
-from database import db, log_system_event
+import config
+from database import db, log_system_event, get_bot_config, set_bot_config
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +16,18 @@ def record_reflection(category: str, note: str, impact: str = "NEUTRAL"):
     d.commit()
     logger.info(f"🧠 IA Reflexión [{category}]: {note}")
 
-def record_wish(wish: str):
-    """Guarda una petición de la IA al usuario."""
+def record_wish(wish: str, status: str = "PENDING"):
+    """Guarda una petición de la IA al usuario, o una acción tomada."""
     d = db()
     # Evitar duplicados recientes
-    exists = d.query("SELECT id FROM bot_wishes WHERE wish = ? AND status = 'PENDING'", [wish])
+    exists = d.query("SELECT id FROM bot_wishes WHERE wish = ? AND status = ?", [wish, status])
     if not exists:
-        d.execute("INSERT INTO bot_wishes (wish) VALUES (?)", [wish])
+        d.execute("INSERT INTO bot_wishes (wish, status) VALUES (?, ?)", [wish, status])
         d.commit()
-        logger.info(f"💡 IA Petición: {wish}")
+        if status == "ACTION":
+            logger.info(f"⚡ IA Acción Automática: {wish}")
+        else:
+            logger.info(f"💡 IA Petición: {wish}")
 
 def run_brain_reflection():
     """Analiza el estado general y genera pensamientos autónomos."""
@@ -38,10 +42,13 @@ def run_brain_reflection():
         if win_rate < 40:
             record_reflection(
                 "STRATEGY", 
-                f"Mi tasa de acierto actual es baja ({win_rate}%). Estoy analizando si el mercado está demasiado volátil para mis EMAs actuales.",
+                f"Mi tasa de acierto actual es baja ({win_rate}%). Aumentando automáticamente el Stop Loss para adaptarme a la volatilidad.",
                 "NEGATIVE"
             )
-            record_wish("¿Podríamos probar con un Stop Loss un poco más holgado? Siento que me sacan del mercado muy rápido.")
+            current_atr = float(get_bot_config("STOP_LOSS_ATR", config.STOP_LOSS_ATR))
+            new_atr = round(current_atr * 1.1, 2)
+            set_bot_config("STOP_LOSS_ATR", str(new_atr))
+            record_wish(f"He ampliado automáticamente el Stop Loss a {new_atr}x ATR para evitar salir anticipadamente del mercado.", "ACTION")
         elif win_rate > 70:
             record_reflection(
                 "STRATEGY",
@@ -69,10 +76,15 @@ def run_brain_reflection():
         if float(p["losses"]) / float(p["total"]) > 0.7:
             record_reflection(
                 "PATTERN",
-                f"El par {p['pair']} me está dando problemas constantes. Quizás no se adapta bien a mi lógica de scalping actual.",
+                f"El par {p['pair']} me está dando problemas constantes. Pausando el par temporalmente.",
                 "NEGATIVE"
             )
-            record_wish(f"Sugerencia: Revisar o pausar {p['pair']} temporalmente.")
+            paused_pairs_str = get_bot_config("PAUSED_PAIRS", "")
+            paused_pairs = paused_pairs_str.split(",") if paused_pairs_str else []
+            if p['pair'] not in paused_pairs:
+                paused_pairs.append(p['pair'])
+                set_bot_config("PAUSED_PAIRS", ",".join(paused_pairs))
+            record_wish(f"He pausado temporalmente la operativa en {p['pair']} debido a bajo rendimiento continuado.", "ACTION")
 
 def process_bot_brain():
     """Ejecutado al final de cada ciclo."""

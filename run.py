@@ -159,10 +159,16 @@ def run_cycle(dry_run: bool = False):
 
     # ── Abrir nuevos trades ───────────────────────────────────────
     if not dry_run and not event_near:
+        from database import get_bot_config
+        dyn_min_score = float(get_bot_config("MIN_SCORE_TO_TRADE", config.MIN_SCORE_TO_TRADE))
+        paused_pairs_str = get_bot_config("PAUSED_PAIRS", "")
+        paused_pairs = paused_pairs_str.split(",") if paused_pairs_str else []
+
         tradeable = sorted(
             [s for s in all_signals
-             if s["score"] >= config.MIN_SCORE_TO_TRADE
-             and s["direction"] != "NEUTRAL"],
+             if s["score"] >= dyn_min_score
+             and s["direction"] != "NEUTRAL"
+             and s["pair"] not in paused_pairs],
             key=lambda x: x["score"], reverse=True
         )
 

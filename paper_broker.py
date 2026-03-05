@@ -23,14 +23,20 @@ class PaperBroker:
         return get_open_trades()
 
     def can_open_trade(self):
-        return len(self.open_trades) < config.MAX_OPEN_TRADES
+        from database import get_bot_config
+        max_open = int(get_bot_config("MAX_OPEN_TRADES", config.MAX_OPEN_TRADES))
+        return len(self.open_trades) < max_open
 
     def _position_size(self, price, stop_loss):
-        risk = self.balance * config.RISK_PER_TRADE
+        from database import get_bot_config
+        dyn_risk = float(get_bot_config("RISK_PER_TRADE", config.RISK_PER_TRADE))
+        dyn_max_pct = float(get_bot_config("MAX_POSITION_SIZE_PCT", config.MAX_POSITION_SIZE_PCT))
+        
+        risk = self.balance * dyn_risk
         if not stop_loss or price == 0:
             return risk
         dist = abs(price - stop_loss) / price
-        max_size = self.balance * config.MAX_POSITION_SIZE_PCT
+        max_size = self.balance * dyn_max_pct
         size = risk / dist if dist else risk
         return min(size, max_size)
 

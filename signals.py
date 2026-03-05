@@ -1,4 +1,5 @@
 from datetime import datetime
+from database import get_bot_config
 
 def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
     """
@@ -132,16 +133,20 @@ def score_signal(vals, config, sentiment_score=0.0, macro_context=None):
         else:
             final_reasons = [{"note": "Sin señales claras"}]
 
-    # Calcular niveles de SL y TP basados en ATR
+    # Calcular niveles de SL y TP basados en ATR dinámico
     stop_loss = None
     take_profit = None
     
+    # Obtener configuración dinámica o usar por defecto de config
+    dyn_sl_atr = float(get_bot_config("STOP_LOSS_ATR", config.STOP_LOSS_ATR))
+    dyn_tp_r = float(get_bot_config("TAKE_PROFIT_R", config.TAKE_PROFIT_R))
+    
     if direction == "BUY":
-        stop_loss = price - (atr * config.STOP_LOSS_ATR)
-        take_profit = price + (atr * config.STOP_LOSS_ATR * config.TAKE_PROFIT_R)
+        stop_loss = price - (atr * dyn_sl_atr)
+        take_profit = price + (atr * dyn_sl_atr * dyn_tp_r)
     elif direction == "SELL":
-        stop_loss = price + (atr * config.STOP_LOSS_ATR)
-        take_profit = price - (atr * config.STOP_LOSS_ATR * config.TAKE_PROFIT_R)
+        stop_loss = price + (atr * dyn_sl_atr)
+        take_profit = price - (atr * dyn_sl_atr * dyn_tp_r)
 
     return {
         "direction": direction,

@@ -162,3 +162,40 @@
 2026-03-05 09:30:09,772 [INFO] TradingBot — 🟢 BTC/USDT (15m) | Score: 6.0 | Precio: 7.281e+04 | Tendencia alcista (EMA200) | Scalping: EMA9 > EMA21 | Sentimiento alcista (0.11) | Macro: Nasdaq alcista
 2026-03-05 09:30:09,807 [INFO] TradingBot — 🟢 ETH/USDT (15m) | Score: 6.0 | Precio: 2132 | Tendencia alcista (EMA200) | Scalping: EMA9 > EMA21 | Sentimiento alcista (0.11) | Macro: Nasdaq alcista
 2026-03-05 09:30:09,825 [INFO] TradingBot — 🟢 SOL/USDT (15m) | Score: 6.0 | Precio: 91.52 | Tendencia alcista (EMA200) | Scalping: EMA9 > EMA21 | Sentimiento alcista (0.11) | Macro: Nasdaq alcista
+2026-03-05 13:42:09,586 [INFO] database — ✅ SQLite local inicializado
+2026-03-05 13:42:09,595 [INFO] TradingBot — ───────────────────────────────────────────────────────
+2026-03-05 13:42:09,605 [INFO] TradingBot — 🔄 Ciclo — 2026-03-05 16:42 UTC
+2026-03-05 13:42:09,626 [INFO] paper_broker — 💼 Balance: $9,719.74
+2026-03-05 13:42:09,638 [INFO] TradingBot — 📡 Obteniendo sentimiento y contexto macro...
+2026-03-05 13:42:11,190 [INFO] news_scraper — 📊 Sentimiento detectado -> CRYPTO: -0.12, FOREX: -0.12
+2026-03-05 13:42:13,408 [INFO] macro_analyzer — 🌍 Macro: DXY UP | Nasdaq DOWN | Risk: LOW
+2026-03-05 13:42:13,426 [INFO] TradingBot — 📡 Descargando datos de mercado...
+2026-03-05 13:42:13,432 [INFO] fetcher — 📡 Cargando BTC/USDT...
+2026-03-05 13:42:18,189 [INFO] fetcher — 📡 Cargando ETH/USDT...
+2026-03-05 13:42:21,716 [INFO] fetcher — 📡 Cargando SOL/USDT...
+2026-03-05 13:42:26,933 [INFO] fetcher — 📡 Cargando EURUSD=X...
+2026-03-05 13:42:27,456 [INFO] fetcher — 📡 Cargando GBPUSD=X...
+2026-03-05 13:42:27,934 [INFO] fetcher — 📡 Cargando USDJPY=X...
+2026-03-05 13:42:28,374 [INFO] TradingBot — ✅ 6/6 pares obtenidos
+2026-03-05 13:42:29,201 [INFO] TradingBot — 🟢 BTC/USDT (15m) | Score: 5.0 | Precio: 7.144e+04 | Tendencia alcista (EMA200) | RSI en zona baja (40.2) | Fuerza alcista detectada
+2026-03-05 13:42:29,225 [INFO] TradingBot — 🟢 ETH/USDT (15m) | Score: 5.0 | Precio: 2081 | Tendencia alcista (EMA200) | RSI en zona baja (39.8) | Fuerza alcista detectada
+2026-03-05 13:42:29,259 [INFO] TradingBot — 🔴 SOL/USDT (15m) | Score: 6.0 | Precio: 88.94 | Tendencia bajista (EMA200) | Scalping: EMA9 < EMA21 | Sentimiento bajista (-0.12) | Macro: Dólar fuerte (DXY ▲)
+2026-03-05 13:42:29,274 [INFO] TradingBot — 🔴 EURUSD=X (15m) | Score: 6.0 | Precio: 1.158 | Tendencia bajista (EMA200) | Scalping: EMA9 < EMA21 | Sentimiento bajista (-0.12) | Macro: Dólar fuerte (DXY ▲)
+2026-03-05 13:42:29,307 [INFO] TradingBot — 🔴 GBPUSD=X (15m) | Score: 6.0 | Precio: 1.332 | Tendencia bajista (EMA200) | Scalping: EMA9 < EMA21 | Sentimiento bajista (-0.12) | Macro: Dólar fuerte (DXY ▲)
+2026-03-05 13:42:29,338 [INFO] TradingBot — 🔴 USDJPY=X (15m) | Score: 5.0 | Precio: 157.6 | RSI en zona alta (57.2) | Sentimiento bajista (-0.12) | Macro: Dólar fuerte (DXY ▲)
+2026-03-05 13:42:29,356 [INFO] paper_broker — ❌ #4 BTC/USDT SL_HIT | P&L $-95.38 | Balance $9,624.36
+2026-03-05 13:42:29,389 [INFO] paper_broker — ❌ #5 ETH/USDT SL_HIT | P&L $-114.42 | Balance $9,509.94
+2026-03-05 13:42:29,406 [INFO] paper_broker — ❌ #6 SOL/USDT SL_HIT | P&L $-142.67 | Balance $9,367.27
+2026-03-05 13:42:29,434 [INFO] paper_broker — ✅ #7 EURUSD=X TP_HIT | P&L $+12.95 | Balance $9,380.22
+2026-03-05 13:42:29,454 [INFO] feedback_engine — 🧠 Procesando feedback para 4 trades...
+2026-03-05 13:42:29,469 [INFO] feedback_engine — 🧠 Feedback generado para #4: Pérdida en BTC/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.
+2026-03-05 13:42:29,480 [INFO] feedback_engine — 🧠 Feedback generado para #5: Pérdida en ETH/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.
+2026-03-05 13:42:29,501 [INFO] feedback_engine — 🧠 Feedback generado para #6: Pérdida en SOL/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.
+2026-03-05 13:42:29,524 [INFO] feedback_engine — 🧠 Feedback generado para #7: Éxito en EURUSD=X. La estrategia de TP funcionó perfectamente.
+2026-03-05 13:42:29,540 [INFO] paper_broker — 📈 #8 SOL/USDT SELL @ 88.94 | SL=89.95 TP=86.93 | $4,690
+2026-03-05 13:42:29,556 [INFO] paper_broker — 📈 #9 EURUSD=X SELL @ 1.158 | SL=1.16 TP=1.155 | $4,690
+2026-03-05 13:42:29,576 [INFO] paper_broker — 📈 #10 GBPUSD=X SELL @ 1.332 | SL=1.334 TP=1.329 | $4,690
+2026-03-05 13:42:29,597 [INFO] paper_broker — 📈 #11 BTC/USDT BUY @ 7.144e+04 | SL=7.086e+04 TP=7.261e+04 | $4,690
+2026-03-05 13:42:29,607 [INFO] paper_broker — 📈 #12 ETH/USDT BUY @ 2081 | SL=2060 TP=2122 | $4,690
+2026-03-05 13:42:29,624 [INFO] paper_broker — 📈 #13 USDJPY=X SELL @ 157.6 | SL=157.8 TP=157.3 | $4,690
+2026-03-05 13:42:29,656 [INFO] brain — 🧠 IA Reflexión [PATTERN]: He notado que el apetito por el riesgo es bajo. Seré más selectivo con mis entradas para proteger el capital.

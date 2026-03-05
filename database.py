@@ -99,7 +99,13 @@ CREATE TABLE IF NOT EXISTS bot_wishes (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp      TEXT DEFAULT (datetime('now')),
     wish           TEXT,
-    status         TEXT DEFAULT 'PENDING' -- 'PENDING', 'FULFILLED', 'IGNORED'
+    status         TEXT DEFAULT 'PENDING' -- 'PENDING', 'FULFILLED', 'IGNORED', 'ACTION'
+);
+CREATE TABLE IF NOT EXISTS bot_config (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    key            TEXT UNIQUE,
+    value          TEXT,
+    updated_at     TEXT DEFAULT (datetime('now'))
 );
 """
 
@@ -390,3 +396,22 @@ def df_to_records(df):
     if df is None or df.empty:
         return []
     return df.reset_index().to_dict('records')
+
+
+def get_bot_config(key: str, default=None):
+    """Obtener configuración dinámica de la base de datos."""
+    rows = db().query("SELECT value FROM bot_config WHERE key = ?", [key])
+    return rows[0]["value"] if rows else default
+
+
+def set_bot_config(key: str, value: str):
+    """Guardar o actualizar configuración dinámica."""
+    d = db()
+    now = datetime.now(timezone.utc).isoformat()
+    d.execute(
+        "INSERT INTO bot_config (key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+        [key, value, now]
+    )
+    d.commit()
+
