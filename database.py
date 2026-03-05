@@ -358,7 +358,7 @@ def get_dashboard_data() -> dict:
     bal_hist= d.query("SELECT timestamp,balance FROM portfolio ORDER BY id DESC LIMIT 60")
     macro   = get_latest_macro()
     memory  = d.query("SELECT * FROM bot_memory ORDER BY id DESC LIMIT 10")
-    wishes  = d.query("SELECT * FROM bot_wishes WHERE status='PENDING' ORDER BY id DESC LIMIT 5")
+    wishes  = d.query("SELECT * FROM bot_wishes WHERE status IN ('PENDING', 'ACTION') ORDER BY id DESC LIMIT 5")
 
     balance_val = float(bal_r[0]["balance"]) if bal_r else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)

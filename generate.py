@@ -426,7 +426,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   if(!w.length){{el.innerHTML='<div class="empty">No hay peticiones pendientes.</div>';return;}}
   el.innerHTML = w.map(x => `
     <div class="wish-item">
-      <div class="wish-icon">💡</div>
+      <div class="wish-icon">${{x.status === 'ACTION' ? '⚡' : '💡'}}</div>
       <div class="wish-text">${{x.wish}}</div>
     </div>
   `).join('');
