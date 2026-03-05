@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="refresh" content="60">
+<title>Trading Bot — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#04080f;--s1:#080f1a;--s2:#0c1422;--border:#16243a;
+  --cyan:#00e5ff;--gold:#ffd000;--green:#00ff88;--red:#ff3b5c;
+  --text:#c8d8e8;--muted:#3d5a7a;
+  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}
+body::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);
+}
+.page{max-width:1320px;margin:0 auto;padding:20px 24px}
+
+/* HEADER */
+.header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:18px 24px;margin-bottom:24px;
+  background:var(--s1);border:1px solid var(--border);
+  border-top:2px solid var(--cyan);border-radius:0 0 12px 12px;
+}
+.hlogo{display:flex;align-items:center;gap:16px}
+.hmark{
+  width:48px;height:48px;font-size:26px;
+  background:linear-gradient(135deg,#001a2e,#003a5c);
+  border:1px solid var(--cyan);border-radius:10px;
+  display:flex;align-items:center;justify-content:center;
+}
+.htitle{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--cyan);letter-spacing:2px}
+.hsub{font-size:12px;color:var(--muted);margin-top:3px}
+.hright{text-align:right}
+.hts{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.hts span{color:var(--gold)}
+.live{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--green);margin-top:4px}
+.live::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1;box-shadow:0 0 6px var(--green)}50%{opacity:.2;box-shadow:none}}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}
+@media(max-width:900px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:20px 22px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;cursor:default}
+.kpi:hover{border-color:var(--cyan);transform:translateY(-1px)}
+.ka{position:absolute;top:0;left:0;width:3px;height:100%;border-radius:10px 0 0 10px}
+.ka.c{background:var(--cyan)}.ka.g{background:var(--green)}.ka.r{background:var(--red)}.ka.y{background:var(--gold)}
+.klabel{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+.kval{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1}
+.kval.c{color:var(--cyan)}.kval.g{color:var(--green)}.kval.r{color:var(--red)}.kval.y{color:var(--gold)}
+.ksub{font-size:11px;color:var(--muted);margin-top:8px}
+
+/* GRID */
+.g2{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-bottom:16px}
+.g2b{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:1100px){.g2{grid-template-columns:1fr}}
+@media(max-width:800px){.g2b{grid-template-columns:1fr}}
+
+/* PANEL */
+.panel{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.ph{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--s1)}
+.phtitle{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1.5px}
+.phsub{font-size:11px;color:var(--muted);margin-left:auto}
+.pb{padding:18px 20px}
+
+/* CHART */
+.cbox{height:200px;position:relative}
+
+/* SIGNALS */
+.slist{display:flex;flex-direction:column;gap:7px}
+.sitem{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--s1);border:1px solid var(--border);border-radius:8px;transition:border-color .15s}
+.sitem:hover{border-color:var(--cyan)}
+.spair{font-family:var(--mono);font-size:13px;font-weight:700}
+.sts{font-size:10px;color:var(--muted);margin-top:2px}
+.dbadge{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 10px;border-radius:4px;letter-spacing:.5px}
+.dBUY{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}
+.dSELL{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.2)}
+.dNEUTRAL{background:rgba(61,90,122,.2);color:var(--muted);border:1px solid var(--border)}
+.sscore{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:600}
+.ssent{font-size:10px;margin-left:8px}
+
+/* TABLE */
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 14px;text-align:left;font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);background:var(--s1)}
+td{padding:11px 14px;border-bottom:1px solid rgba(22,36,58,.6)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(0,229,255,.02)}
+.tm{font-family:var(--mono);font-size:11px}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700}
+.bWIN{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.15)}
+.bLOSS{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.15)}
+.bOPEN{background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.15)}
+
+/* DONUT */
+.dw{display:flex;align-items:center;gap:24px}
+.dc{width:110px;height:110px;flex-shrink:0}
+.ds{flex:1}
+.drow{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.drow:last-child{border-bottom:none}
+.dlabel{display:flex;align-items:center;gap:8px;color:var(--muted)}
+.ddot{width:8px;height:8px;border-radius:50%}
+
+.empty{text-align:center;padding:40px 20px;color:var(--muted);font-size:12px}
+.empty-icon{font-size:32px;margin-bottom:10px;opacity:.5}
+
+footer{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--border);margin-top:20px}
+footer span{color:var(--cyan)}
+/* LESSONS */
+.litem{padding:12px;border-bottom:1px solid var(--border);font-size:11px}
+.litem:last-child{border-bottom:none}
+.lts{color:var(--muted);font-size:9px;margin-bottom:4px;display:flex;justify-content:space-between}
+.ltext{line-height:1.4;color:#eee}
+.lscore{color:var(--gold);font-weight:700}
+
+/* MACRO */
+.mitem{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}
+.mitem:last-child{border-bottom:none}
+.mval{font-family:var(--mono);font-size:12px;font-weight:700}
+.mbadge{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:8px}
+.mUP{color:var(--green);border:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05)}
+.mDOWN{color:var(--red);border:1px solid rgba(255,59,92,.2);background:rgba(255,59,92,.05)}
+.mNEUTRAL{color:var(--muted);border:1px solid var(--border);background:rgba(61,90,122,.1)}
+.risk-box{text-align:center;padding:15px;border-radius:8px;margin-top:10px;font-weight:800;letter-spacing:1px;font-size:14px}
+.rHIGH{background:rgba(0,255,136,.1);color:var(--green);border:1px solid var(--green)}
+.rLOW{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}
+.rNEUTRAL{background:var(--s1);color:var(--muted);border:1px solid var(--border)}
+
+/* BRAIN */
+.brain-item{padding:12px;border-bottom:1px solid var(--border);position:relative}
+.brain-item:last-child{border-bottom:none}
+.brain-cat{font-family:var(--mono);font-size:9px;color:var(--gold);text-transform:uppercase;margin-bottom:4px}
+.brain-note{font-size:11px;line-height:1.4}
+.brain-impact{position:absolute;right:12px;top:12px;width:6px;height:6px;border-radius:50%}
+.iPOSITIVE{background:var(--green);box-shadow:0 0 5px var(--green)}
+.iNEGATIVE{background:var(--red);box-shadow:0 0 5px var(--red)}
+.iNEUTRAL{background:var(--muted)}
+
+/* WISHES */
+.wish-item{display:flex;align-items:center;gap:12px;padding:10px;background:rgba(0,229,255,0.03);border:1px solid var(--border);border-radius:6px;margin-bottom:8px}
+.wish-icon{font-size:16px}
+.wish-text{font-size:11px;font-weight:500;color:var(--cyan)}
+
+/* PULSE */
+.pulse-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:10px;border-bottom:1px solid var(--border)}
+.pulse-item:last-child{border-bottom:none}
+.pdot{width:6px;height:6px;border-radius:50%;margin-right:8px;display:inline-block}
+.pSUCCESS{background:var(--green);box-shadow:0 0 5px var(--green)}
+.pRUNNING{background:var(--gold);box-shadow:0 0 5px var(--gold);animation: blink 1s infinite}
+@keyframes blink { 0%{opacity:1} 50%{opacity:0.3} 100%{opacity:1} }
+
+/* LOGS */
+.log-container{
+  font-family:var(--mono);font-size:10px;height:340px;overflow-y:auto;
+  background:var(--s1);padding:12px;border:1px solid var(--border);
+  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
+}
+.log-container::-webkit-scrollbar { width: 6px; }
+.log-container::-webkit-scrollbar-track { background: transparent; }
+.log-container::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+.log-line{
+  margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.02);
+  display:flex;line-height:1.5;
+}
+.log-ts{color:var(--muted);min-width:75px;flex-shrink:0}
+.log-lvl{width:48px;font-weight:700;margin-right:8px;flex-shrink:0}
+.l-INFO{color:var(--cyan)}
+.l-WARNING{color:var(--gold)}
+.l-ERROR{color:var(--red)}
+.log-msg{color:rgba(255,255,255,0.9);word-break:break-word}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="header">
+  <div class="hlogo">
+    <div class="hmark">🤖</div>
+    <div>
+      <div class="htitle">TRADING BOT</div>
+      <div class="hsub">Paper Trading · GitHub Actions + Turso</div>
+    </div>
+  </div>
+  <div class="hright">
+    <div class="hts">Actualizado: <span id="lastUpdate">...</span></div>
+    <div class="live">ACTIVO 24/7</div>
+  </div>
+</header>
+
+<div class="kpis" id="kpis"></div>
+
+<div class="g2">
+  <div class="panel">
+    <div class="ph"><span>📈</span><span class="phtitle">Evolución del Balance</span><span class="phsub">demo USD</span></div>
+    <div class="pb"><div class="cbox"><canvas id="balChart"></canvas></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🔔</span><span class="phtitle">Últimas Señales</span></div>
+    <div class="pb"><div class="slist" id="sigList"></div></div>
+  </div>
+</div>
+
+<div class="g2b">
+  <div class="panel">
+    <div class="ph"><span>📋</span><span class="phtitle">Trades Recientes</span></div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Par</th><th>Dir</th><th>Apertura</th><th>P&amp;L</th><th>Estado</th><th>Fecha</th></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🎯</span><span class="phtitle">Win Rate</span></div>
+    <div class="pb">
+      <div class="dw">
+        <div class="dc"><canvas id="wrChart"></canvas></div>
+        <div class="ds" id="dstats"></div>
+      </div>
+    </div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🧠</span><span class="phtitle">Diario de Aprendizaje</span><span class="phsub">Feedback Engine</span></div>
+    <div class="pb"><div id="lessonFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>📠</span><span class="phtitle">Cerebro del Bot</span><span class="phsub">IA Consciousness</span></div>
+    <div class="pb"><div id="brainFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>💡</span><span class="phtitle">Peticiones de la IA</span><span class="phsub">Autonomous Requests</span></div>
+    <div class="pb"><div id="wishFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
+    <div class="pb" id="macroBox"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Activity Heartbeat</span></div>
+    <div class="pb" id="pulseBox"></div>
+  </div>
+  <div class="panel" style="grid-column: 1 / -1">
+    <div class="ph"><span>📠</span><span class="phtitle">Registro de Actividad</span><span class="phsub">Live Console Logs</span></div>
+    <div class="pb"><div class="log-container" id="logBox"></div></div>
+  </div>
+</div>
+
+</div>
+<footer>🤖 Trading Bot · Paper Trading · <span>Sin dinero real</span> · Próxima actualización ~15 min</footer>
+
+<script>
+const D = {"balance": 9719.74, "total_pnl": -280.26, "total_trades": 3, "wins": 0, "losses": 3, "open_trades": 4, "win_rate": 0.0, "signals": [{"pair": "USDJPY=X", "direction": "NEUTRAL", "score": 4.0, "price": 157.38499450683594, "timestamp": "2026-03-05T12:16:17.232421+00:00", "sentiment": -0.12597}, {"pair": "GBPUSD=X", "direction": "NEUTRAL", "score": 4.0, "price": 1.3358268737792969, "timestamp": "2026-03-05T12:16:17.207858+00:00", "sentiment": -0.12597}, {"pair": "EURUSD=X", "direction": "SELL", "score": 5.0, "price": 1.16130530834198, "timestamp": "2026-03-05T12:16:17.188882+00:00", "sentiment": -0.12597}, {"pair": "SOL/USDT", "direction": "BUY", "score": 6.0, "price": 91.63, "timestamp": "2026-03-05T12:16:17.173128+00:00", "sentiment": 0.17961999999999997}, {"pair": "ETH/USDT", "direction": "BUY", "score": 6.0, "price": 2130.88, "timestamp": "2026-03-05T12:16:17.158220+00:00", "sentiment": 0.17961999999999997}, {"pair": "BTC/USDT", "direction": "BUY", "score": 6.0, "price": 72872.44, "timestamp": "2026-03-05T12:16:17.142886+00:00", "sentiment": 0.17961999999999997}, {"pair": "ETH/USDT", "direction": "BUY", "score": 6.0, "price": 2169.07, "timestamp": "2026-03-04T20:21:37.799526+00:00", "sentiment": 0.24680999999999997}, {"pair": "BTC/USDT", "direction": "BUY", "score": 6.0, "price": 73402.01, "timestamp": "2026-03-04T20:21:37.766322+00:00", "sentiment": 0.24680999999999997}, {"pair": "SOL/USDT", "direction": "BUY", "score": 7.0, "price": 93.28, "timestamp": "2026-03-04T20:21:37.827910+00:00", "sentiment": 0.24680999999999997}, {"pair": "SOL/USDT", "direction": "BUY", "score": 5.0, "price": 92.95, "timestamp": "2026-03-04T20:10:41.414796+00:00", "sentiment": 0.26663}, {"pair": "ETH/USDT", "direction": "BUY", "score": 5.0, "price": 2164.4, "timestamp": "2026-03-04T20:10:41.383502+00:00", "sentiment": 0.26663}, {"pair": "BTC/USDT", "direction": "BUY", "score": 5.0, "price": 73353.68, "timestamp": "2026-03-04T20:10:41.349357+00:00", "sentiment": 0.26663}, {"pair": "SOL/USDT", "direction": "BUY", "score": 5.0, "price": 92.86, "timestamp": "2026-03-04T20:10:02.160335+00:00", "sentiment": 0.26663}, {"pair": "ETH/USDT", "direction": "BUY", "score": 5.0, "price": 2163.98, "timestamp": "2026-03-04T20:10:02.096712+00:00", "sentiment": 0.26663}, {"pair": "BTC/USDT", "direction": "BUY", "score": 5.0, "price": 73309.63, "timestamp": "2026-03-04T20:10:02.042672+00:00", "sentiment": 0.26663}, {"pair": "SOL/USDT", "direction": "BUY", "score": 5.0, "price": 93.71, "timestamp": "2026-03-04T19:45:48.492583+00:00", "sentiment": 0.32086000000000003}, {"pair": "ETH/USDT", "direction": "BUY", "score": 5.0, "price": 2181.78, "timestamp": "2026-03-04T19:45:48.443367+00:00", "sentiment": 0.32086000000000003}, {"pair": "BTC/USDT", "direction": "BUY", "score": 5.0, "price": 73708.3, "timestamp": "2026-03-04T19:45:48.391130+00:00", "sentiment": 0.32086000000000003}, {"pair": "SOL/USDT", "direction": "BUY", "score": 5.0, "price": 93.41, "timestamp": "2026-03-04T19:41:24.320390+00:00", "sentiment": 0.32086000000000003}, {"pair": "ETH/USDT", "direction": "BUY", "score": 5.0, "price": 2184.22, "timestamp": "2026-03-04T19:41:24.273201+00:00", "sentiment": 0.32086000000000003}], "trades": [{"id": 7, "signal_id": 19, "pair": "EURUSD=X", "direction": "SELL", "open_time": "2026-03-05T12:16:17.673344+00:00", "close_time": null, "open_price": 1.16130530834198, "close_price": null, "stop_loss": 1.1622833879628875, "take_profit": 1.159349149100165, "position_size": 4859.87, "pnl": null, "pnl_pct": null, "status": "OPEN", "close_reason": null, "lesson": null, "performance_score": null}, {"id": 6, "signal_id": 18, "pair": "SOL/USDT", "direction": "BUY", "open_time": "2026-03-05T12:16:17.661216+00:00", "close_time": null, "open_price": 91.63, "close_price": null, "stop_loss": 90.98991173452524, "take_profit": 92.91017653094953, "position_size": 4859.87, "pnl": null, "pnl_pct": null, "status": "OPEN", "close_reason": null, "lesson": null, "performance_score": null}, {"id": 5, "signal_id": 17, "pair": "ETH/USDT", "direction": "BUY", "open_time": "2026-03-05T12:16:17.636001+00:00", "close_time": null, "open_price": 2130.88, "close_price": null, "stop_loss": 2116.974645053287, "take_profit": 2158.690709893426, "position_size": 4859.87, "pnl": null, "pnl_pct": null, "status": "OPEN", "close_reason": null, "lesson": null, "performance_score": null}, {"id": 4, "signal_id": 16, "pair": "BTC/USDT", "direction": "BUY", "open_time": "2026-03-05T12:16:17.617816+00:00", "close_time": null, "open_price": 72872.44, "close_price": null, "stop_loss": 72496.87587749846, "take_profit": 73623.56824500309, "position_size": 4859.87, "pnl": null, "pnl_pct": null, "status": "OPEN", "close_reason": null, "lesson": null, "performance_score": null}, {"id": 3, "signal_id": 3, "pair": "SOL/USDT", "direction": "BUY", "open_time": "2026-03-04T19:41:24.404159+00:00", "close_time": "2026-03-05T12:16:17.519573+00:00", "open_price": 93.41, "close_price": 91.63, "stop_loss": 92.4567490823462, "take_profit": 95.31650183530758, "position_size": 5000.0, "pnl": -95.28, "pnl_pct": -1.91, "status": "LOSS", "close_reason": "SL_HIT", "lesson": "Pérdida en SOL/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.", "performance_score": 2.0}, {"id": 2, "signal_id": 2, "pair": "ETH/USDT", "direction": "BUY", "open_time": "2026-03-04T19:41:24.382784+00:00", "close_time": "2026-03-05T12:16:17.476064+00:00", "open_price": 2184.22, "close_price": 2130.88, "stop_loss": 2162.7749308739744, "take_profit": 2227.1101382520505, "position_size": 5000.0, "pnl": -122.1, "pnl_pct": -2.44, "status": "LOSS", "close_reason": "SL_HIT", "lesson": "Pérdida en ETH/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.", "performance_score": 2.0}, {"id": 1, "signal_id": 1, "pair": "BTC/USDT", "direction": "BUY", "open_time": "2026-03-04T19:41:24.344954+00:00", "close_time": "2026-03-05T12:16:17.458534+00:00", "open_price": 73800.55, "close_price": 72872.44, "stop_loss": 73247.35110902565, "take_profit": 74906.94778194871, "position_size": 5000.0, "pnl": -62.88, "pnl_pct": -1.26, "status": "LOSS", "close_reason": "SL_HIT", "lesson": "Pérdida en BTC/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado.", "performance_score": 2.0}], "balance_history": [{"timestamp": "2026-03-04T19:40:55.583124+00:00", "balance": 10000.0}, {"timestamp": "2026-03-05T12:16:17.465637+00:00", "balance": 9937.12}, {"timestamp": "2026-03-05T12:16:17.484754+00:00", "balance": 9815.02}, {"timestamp": "2026-03-05T12:16:17.526506+00:00", "balance": 9719.74}], "macro": {"id": 7, "timestamp": "2026-03-05T12:16:02.365369+00:00", "dxy_val": 98.98300170898438, "nasdaq_val": 22803.51953125, "risk_appetite": "HIGH", "dxy_trend": "DOWN", "nasdaq_trend": "UP"}, "heartbeats": [{"id": 13, "timestamp": "2026-03-05T12:16:17.701636+00:00", "status": "SUCCESS", "note": "Ciclo completado en 19.1s"}, {"id": 12, "timestamp": "2026-03-05T12:15:58.627647+00:00", "status": "RUNNING", "note": "Iniciando ciclo en 12:15"}, {"id": 11, "timestamp": "2026-03-04T20:21:38.105003+00:00", "status": "SUCCESS", "note": "Ciclo completado en 17.1s"}, {"id": 10, "timestamp": "2026-03-04T20:21:20.988438+00:00", "status": "RUNNING", "note": "Iniciando ciclo en 20:21"}, {"id": 9, "timestamp": "2026-03-04T20:20:47.551492+00:00", "status": "RUNNING", "note": "Iniciando ciclo en 20:20"}], "system_logs": [{"id": 174, "timestamp": "2026-03-05T12:16:17.683547+00:00", "level": "INFO", "message": "📈 #7 EURUSD=X SELL @ 1.161 | SL=1.162 TP=1.159 | $4,860"}, {"id": 173, "timestamp": "2026-03-05T12:16:17.667733+00:00", "level": "INFO", "message": "📈 #6 SOL/USDT BUY @ 91.63 | SL=90.99 TP=92.91 | $4,860"}, {"id": 172, "timestamp": "2026-03-05T12:16:17.654067+00:00", "level": "INFO", "message": "📈 #5 ETH/USDT BUY @ 2131 | SL=2117 TP=2159 | $4,860"}, {"id": 171, "timestamp": "2026-03-05T12:16:17.626028+00:00", "level": "INFO", "message": "📈 #4 BTC/USDT BUY @ 7.287e+04 | SL=7.25e+04 TP=7.362e+04 | $4,860"}, {"id": 170, "timestamp": "2026-03-05T12:16:17.611847+00:00", "level": "INFO", "message": "🧠 Feedback generado para #3: Pérdida en SOL/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado."}, {"id": 169, "timestamp": "2026-03-05T12:16:17.599439+00:00", "level": "INFO", "message": "🧠 Feedback generado para #2: Pérdida en ETH/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado."}, {"id": 168, "timestamp": "2026-03-05T12:16:17.559605+00:00", "level": "INFO", "message": "🧠 Feedback generado para #1: Pérdida en BTC/USDT. El Stop Loss protegió el capital. Considerar si el SL era muy ajustado."}, {"id": 167, "timestamp": "2026-03-05T12:16:17.541048+00:00", "level": "INFO", "message": "🧠 Procesando feedback para 3 trades..."}, {"id": 166, "timestamp": "2026-03-05T12:16:17.533665+00:00", "level": "INFO", "message": "❌ #3 SOL/USDT SL_HIT | P&L $-95.28 | Balance $9,719.74"}, {"id": 165, "timestamp": "2026-03-05T12:16:17.494332+00:00", "level": "INFO", "message": "❌ #2 ETH/USDT SL_HIT | P&L $-122.10 | Balance $9,815.02"}, {"id": 164, "timestamp": "2026-03-05T12:16:17.469738+00:00", "level": "INFO", "message": "❌ #1 BTC/USDT SL_HIT | P&L $-62.88 | Balance $9,937.12"}, {"id": 163, "timestamp": "2026-03-05T12:16:17.437521+00:00", "level": "INFO", "message": "🔍 USDJPY=X: Score 4.0/10 - (Neutral) Tendencia alcista (EMA200) | (Neutral) Scalping: EMA9 > EMA21 | (Neutral) Macro: Nasdaq alcista"}, {"id": 162, "timestamp": "2026-03-05T12:16:17.406905+00:00", "level": "INFO", "message": "🔍 GBPUSD=X: Score 4.0/10 - (Neutral) Tendencia alcista (EMA200) | (Neutral) Scalping: EMA9 > EMA21 | (Neutral) Macro: Nasdaq alcista"}, {"id": 161, "timestamp": "2026-03-05T12:16:17.400732+00:00", "level": "INFO", "message": "🔴 EURUSD=X (15m) | Score: 5.0 | Precio: 1.161 | Tendencia bajista (EMA200) | Scalping: EMA9 < EMA21 | Sentimiento bajista (-0.13)"}, {"id": 160, "timestamp": "2026-03-05T12:16:17.386303+00:00", "level": "INFO", "message": "🔍 EURUSD=X: Score 5.0/10 - Tendencia bajista (EMA200) | Scalping: EMA9 < EMA21 | Sentimiento bajista (-0.13)"}], "bot_memory": [], "bot_wishes": [], "last_updated": "2026-03-05T12:25:27.845311+00:00"};
+const f=(n,d=2)=>n==null?'—':Number(n).toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fd=ts=>{if(!ts)return'—';try{return new Date(ts).toLocaleString('es-AR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}catch{return String(ts).slice(0,16)}};
+
+// Update header time
+document.getElementById('lastUpdate').innerText = fd(D.last_updated);
+
+// KPIs
+(()=>{
+  const ret=D.balance?((D.balance-10000)/10000*100):0;
+  document.getElementById('kpis').innerHTML=`
+    <div class="kpi"><div class="ka c"></div><div class="klabel">💰 Balance Demo</div><div class="kval c">$${f(D.balance)}</div><div class="ksub">Inicial: $10,000</div></div>
+    <div class="kpi"><div class="ka ${ret>=0?'g':'r'}"></div><div class="klabel">📊 Retorno</div><div class="kval ${ret>=0?'g':'r'}">${ret>=0?'+':''}${f(ret)}%</div><div class="ksub">P&L: $${f(D.total_pnl)}</div></div>
+    <div class="kpi"><div class="ka y"></div><div class="klabel">🎯 Win Rate</div><div class="kval y">${f(D.win_rate,1)}%</div><div class="ksub">${D.wins}W / ${D.losses}L</div></div>
+    <div class="kpi"><div class="ka c"></div><div class="klabel">📈 Trades</div><div class="kval c">${D.total_trades}</div><div class="ksub">${D.open_trades} abiertos</div></div>
+    <div class="kpi" id="sentKpi"></div>
+  `;
+  
+  // Calculate average sentiment
+  const sigs = D.signals || [];
+  const avgSent = sigs.length ? sigs.reduce((a,b)=>a+(Number(b.sentiment)||0), 0) / sigs.length : 0;
+  const sentColor = avgSent > 0.1 ? 'g' : avgSent < -0.1 ? 'r' : 'y';
+  const sentLabel = avgSent > 0.4 ? 'MUY ALCISTA' : avgSent > 0.1 ? 'ALCISTA' : avgSent < -0.4 ? 'MUY BAJISTA' : avgSent < -0.1 ? 'BAJISTA' : 'NEUTRAL';
+  
+  document.getElementById('sentKpi').innerHTML = `
+    <div class="ka ${sentColor}"></div>
+    <div class="klabel">🎭 Sentimiento</div>
+    <div class="kval ${sentColor}">${sentLabel}</div>
+    <div class="ksub">Score: ${avgSent.toFixed(2)} (Promedio)</div>
+  `;
+})();
+
+// Balance chart
+(()=>{
+  const h=D.balance_history||[];if(!h.length)return;
+  new Chart(document.getElementById('balChart'),{type:'line',data:{labels:h.map(x=>fd(x.timestamp)),datasets:[{data:h.map(x=>parseFloat(x.balance)),borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.05)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{grid:{color:'rgba(22,36,58,1)'},ticks:{color:'#3d5a7a',font:{family:'IBM Plex Mono',size:10},callback:v=>'$'+v.toLocaleString()}}}}});
+})();
+
+// Señales
+(()=>{
+  const el=document.getElementById('sigList'),s=D.signals||[];
+  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,10).map(x=>{
+    const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
+    return `<div class="sitem"><div><div class="spair">${x.pair} <span class="ssent" title="Sentimiento: ${Number(x.sentiment).toFixed(2)}">${sentIcon}</span></div><div class="sts">${fd(x.timestamp)}</div></div><span class="dbadge d${x.direction}">${x.direction}</span><div class="sscore">${f(x.score,1)}/10</div></div>`;
+  }).join('');
+})();
+
+// Trades
+(()=>{
+  const tb=document.getElementById('tbody'),t=D.trades||[];
+  if(!t.length){tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><p>Sin trades aún</p></div></td></tr>';return;}
+  tb.innerHTML=t.slice(0,12).map(x=>{
+    const p=x.pnl!=null?`<span class="tm" style="color:${Number(x.pnl)>=0?'var(--green)':'var(--red)'}">${Number(x.pnl)>=0?'+':''}$${f(x.pnl)}</span>`:'<span style="color:var(--muted)">—</span>';
+    return`<tr><td class="tm">${x.pair}</td><td><span class="badge b${x.direction==='BUY'?'WIN':'LOSS'}">${x.direction}</span></td><td class="tm">$${f(x.open_price,4)}</td><td>${p}</td><td><span class="badge b${status}">${x.status}</span></td><td style="color:var(--muted);font-size:11px">${fd(x.open_time)}</td></tr>`;
+  }).join('');
+})();
+
+// Donut
+(()=>{
+  const w=D.wins||0,l=D.losses||0,tot=w+l;
+  if(!tot){document.getElementById('dstats').innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px">Sin trades cerrados aún</div>';return;}
+  new Chart(document.getElementById('wrChart'),{type:'doughnut',data:{labels:['Ganados','Perdidos'],datasets:[{data:[w,l],backgroundColor:['rgba(0,255,136,0.75)','rgba(255,59,92,0.75)'],borderColor:['#00ff88','#ff3b5c'],borderWidth:1}]},options:{cutout:'74%',plugins:{legend:{display:false}}}});
+  document.getElementById('dstats').innerHTML=`
+    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--green)"></div>Ganadores</div><div style="color:var(--green);font-family:var(--mono);font-weight:600">${w} (${f(w/tot*100,1)}%)</div></div>
+    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--red)"></div>Perdedores</div><div style="color:var(--red);font-family:var(--mono);font-weight:600">${l} (${f(l/tot*100,1)}%)</div></div>
+    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--cyan)"></div>Abiertos</div><div style="font-family:var(--mono);font-weight:600">${D.open_trades}</div></div>
+  `;
+})();
+
+// Lessons
+(()=>{
+  const el=document.getElementById('lessonFeed'),t=D.trades||[];
+  const lessons = t.filter(x=>x.lesson);
+  if(!lessons.length){el.innerHTML='<div class="empty"><div class="empty-icon">🧠</div><p>Esperando cierre de trades para generar aprendizaje...</p></div>';return;}
+  el.innerHTML=lessons.slice(0,5).map(x=>`
+    <div class="litem">
+      <div class="lts"><span>${fd(x.open_time)} — ${x.pair}</span><span class="lscore">${f(x.performance_score,1)}/10</span></div>
+      <div class="ltext">${x.lesson}</div>
+    </div>
+  `).join('');
+})();
+
+// Macro
+(()=>{
+  const el=document.getElementById('macroBox'), m=D.macro;
+  if(!m){el.innerHTML='<div class="empty"><div class="empty-icon">🌍</div><p>Sincronizando datos macro...</p></div>';return;}
+  
+  el.innerHTML=`
+    <div class="mitem">
+      <div><div style="font-size:12px;font-weight:600">DXY (Dollar Index)</div><div style="font-size:10px;color:var(--muted)">Inversamente correlacionado</div></div>
+      <div class="mval">${f(m.dxy_val)} <span class="mbadge m${m.dxy_trend}">${m.dxy_trend}</span></div>
+    </div>
+    <div class="mitem">
+      <div><div style="font-size:12px;font-weight:600">Nasdaq 100</div><div style="font-size:10px;color:var(--muted)">Correlación con riesgo</div></div>
+      <div class="mval">${f(m.nasdaq_val,0)} <span class="mbadge m${m.nasdaq_trend}">${m.nasdaq_trend}</span></div>
+    </div>
+    <div class="risk-box r${m.risk_appetite}">
+      APETITO POR EL RIESGO: ${m.risk_appetite}
+    </div>
+    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:10px">
+      Sincronizado: ${fd(m.timestamp)}
+    </div>
+  `;
+})();
+
+// Pulse
+(()=>{
+  const el=document.getElementById('pulseBox'), hb=D.heartbeats||[];
+  if(!hb.length){el.innerHTML='<div class="empty">Esperando pulso...</div>';return;}
+  
+  el.innerHTML = hb.map(h => `
+    <div class="pulse-item">
+      <div><span class="pdot p${h.status}"></span><span style="font-weight:600">${h.status}</span></div>
+      <div style="color:var(--muted);font-size:9px">${h.note}</div>
+      <div style="font-family:var(--mono);opacity:0.8">${fd(h.timestamp).split(',')[1]}</div>
+    </div>
+  `).join('');
+})();
+
+// Bot Brain
+(()=>{
+  const el=document.getElementById('brainFeed'), m=D.bot_memory||[];
+  if(!m.length){el.innerHTML='<div class="empty">La IA aún no ha generado reflexiones...</div>';return;}
+  el.innerHTML = m.map(x => `
+    <div class="brain-item">
+      <div class="brain-cat">${x.category}</div>
+      <div class="brain-impact i${x.impact}"></div>
+      <div class="brain-note">${x.note}</div>
+      <div style="font-size:8px;color:var(--muted);margin-top:6px">${fd(x.timestamp)}</div>
+    </div>
+  `).join('');
+})();
+
+// Bot Wishes
+(()=>{
+  const el=document.getElementById('wishFeed'), w=D.bot_wishes||[];
+  if(!w.length){el.innerHTML='<div class="empty">No hay peticiones pendientes.</div>';return;}
+  el.innerHTML = w.map(x => `
+    <div class="wish-item">
+      <div class="wish-icon">💡</div>
+      <div class="wish-text">${x.wish}</div>
+    </div>
+  `).join('');
+})();
+
+// Activity Logs
+(()=>{
+  const el=document.getElementById('logBox'), logs=D.system_logs||[];
+  if(!logs.length){el.innerHTML='<div class="empty">Esperando registros...</div>';return;}
+  
+  el.innerHTML = logs.map(l => `
+    <div class="log-line">
+      <div class="log-ts">${fd(l.timestamp).split(',')[1]}</div>
+      <div class="log-lvl l-${l.level}">[${l.level}]</div>
+      <div class="log-msg">${l.message}</div>
+    </div>
+  `).join('');
+})();
+</script>
+</body></html>
