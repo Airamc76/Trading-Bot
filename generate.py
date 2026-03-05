@@ -23,7 +23,7 @@ def generate():
     Path("site").mkdir(exist_ok=True)
     Path("site/index.html").write_text(html, encoding="utf-8")
 
-    print(f"✅ Dashboard generado → site/index.html")
+    print(f"✅ Dashboard generado → site/index.html ({datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC)")
     print(f"   Balance: ${data['balance']:,.2f} | "
           f"Win Rate: {data['win_rate']}% | "
           f"Trades: {data['total_trades']}")
