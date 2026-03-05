@@ -1,0 +1,72 @@
+[
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T17:35:23Z",
+    "msg": "fix(dashboard): checkout main explicitly to pull latest db changes"
+  },
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T17:27:38Z",
+    "msg": "fix(workflows): add commit step for local db and write permissions"
+  },
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T17:26:38Z",
+    "msg": "feat: implement autonomous bot features and auto-save db in runner"
+  },
+  {
+    "name": "📊 Actualizar Dashboard",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T16:05:28Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T16:03:50Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "📊 Actualizar Dashboard",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T15:07:40Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T15:05:55Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "📊 Actualizar Dashboard",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T14:10:37Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "🤖 Trading Bot",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T14:09:07Z",
+    "msg": "fix(dashboard, brain): fix JSON rendering in generate.py and division type casting in brain.py"
+  },
+  {
+    "name": "📊 Actualizar Dashboard",
+    "status": "completed",
+    "conclusion": "success",
+    "created_at": "2026-03-05T14:08:25Z",
+    "msg": "fix(deps): pin ccxt to 4.3.98 to avoid lighter_client bug on Python 3.12"
+  }
+]
