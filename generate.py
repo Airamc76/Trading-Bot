@@ -390,7 +390,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
       Sincronizado: ${{fd(m.timestamp)}}
     </div>
   `;
-}}})();
+}})();
 
 // Pulse
 (()=>{{
