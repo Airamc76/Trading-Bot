@@ -46,6 +46,7 @@ from paper_broker import PaperBroker
 from news_scraper import get_market_sentiment
 from feedback_engine import run_feedback_cycle
 from macro_analyzer import get_macro_context, is_high_impact_event_near
+from brain import process_bot_brain
 
 
 def send_telegram(message: str):
@@ -122,11 +123,26 @@ def run_cycle(dry_run: bool = False):
     if all_prices_to_save:
         save_prices(all_prices_to_save)
 
-    # Log de razonamiento y alertas
+    # Log de razonamiento y alertas + Guardar TODAS las señales para el dashboard
     for signal in all_signals:
         pair = signal["pair"]
         reasons_text = " | ".join([r["note"] for r in signal["reasons"]])
         log_system_event("INFO", f"🔍 {pair}: Score {signal['score']:.1f}/10 - {reasons_text}")
+
+        # Guardamos la señal en la DB aunque sea NEUTRAL para que aparezca en el Dashboard
+        # Pero marcamos si fue una entrada real o solo monitoreo
+        save_signal({
+            "pair":        signal["pair"],
+            "timeframe":   signal["timeframe"],
+            "timestamp":   signal["timestamp"],
+            "direction":   signal["direction"],
+            "score":       signal["score"],
+            "price":       signal["price"],
+            "stop_loss":   signal.get("stop_loss"),
+            "take_profit": signal.get("take_profit"),
+            "reasons":     json.dumps(signal.get("reasons", [])),
+            "sentiment":   signal.get("sentiment", 0)
+        })
 
         if signal["score"] >= config.MIN_SCORE_ALERT:
             logger.info(format_signal_summary(pair, config.PRIMARY_TIMEFRAME, signal, signal["price"]))
@@ -153,18 +169,11 @@ def run_cycle(dry_run: bool = False):
         for signal in tradeable:
             if not broker.can_open_trade():
                 break
-            signal_id = save_signal({
-                "pair":        signal["pair"],
-                "timeframe":   signal["timeframe"],
-                "timestamp":   signal["timestamp"],
-                "direction":   signal["direction"],
-                "score":       signal["score"],
-                "price":       signal["price"],
-                "stop_loss":   signal.get("stop_loss"),
-                "take_profit": signal.get("take_profit"),
-                "reasons":     json.dumps(signal.get("reasons", [])),
-                "sentiment":   signal.get("sentiment", 0)
-            })
+            
+            # Recuperar el ID de la señal ya guardada o buscar la última para este par
+            last_sigs = get_latest_signals(10)
+            signal_id = next((s["id"] for s in last_sigs if s["pair"] == signal["pair"]), 0)
+
             trade_id = broker.open_trade(
                 signal_id   = signal_id,
                 pair        = signal["pair"],
@@ -182,6 +191,9 @@ def run_cycle(dry_run: bool = False):
                     f"Precio: {signal['price']:.4g}\n"
                     f"📌 {notes}"
                 )
+        
+        # ── IA CONSCIOUSNESS: Reflexión post-operativa ───────────────
+        process_bot_brain()
 
     # ── Resumen del ciclo ─────────────────────────────────────────
     stats   = broker.stats()

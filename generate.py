@@ -163,6 +163,21 @@ footer span{{color:var(--cyan)}}
 .rLOW{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}}
 .rNEUTRAL{{background:var(--s1);color:var(--muted);border:1px solid var(--border)}}
 
+/* BRAIN */
+.brain-item{{padding:12px;border-bottom:1px solid var(--border);position:relative}}
+.brain-item:last-child{{border-bottom:none}}
+.brain-cat{{font-family:var(--mono);font-size:9px;color:var(--gold);text-transform:uppercase;margin-bottom:4px}}
+.brain-note{{font-size:11px;line-height:1.4}}
+.brain-impact{{position:absolute;right:12px;top:12px;width:6px;height:6px;border-radius:50%}}
+.iPOSITIVE{{background:var(--green);box-shadow:0 0 5px var(--green)}}
+.iNEGATIVE{{background:var(--red);box-shadow:0 0 5px var(--red)}}
+.iNEUTRAL{{background:var(--muted)}}
+
+/* WISHES */
+.wish-item{{display:flex;align-items:center;gap:12px;padding:10px;background:rgba(0,229,255,0.03);border:1px solid var(--border);border-radius:6px;margin-bottom:8px}}
+.wish-icon{{font-size:16px}}
+.wish-text{{font-size:11px;font-weight:500;color:var(--cyan)}}
+
 /* PULSE */
 .pulse-item{{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:10px;border-bottom:1px solid var(--border)}}
 .pulse-item:last-child{{border-bottom:none}}
@@ -247,6 +262,14 @@ footer span{{color:var(--cyan)}}
     <div class="pb"><div id="lessonFeed"></div></div>
   </div>
   <div class="panel">
+    <div class="ph"><span>📠</span><span class="phtitle">Cerebro del Bot</span><span class="phsub">IA Consciousness</span></div>
+    <div class="pb"><div id="brainFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>💡</span><span class="phtitle">Peticiones de la IA</span><span class="phsub">Autonomous Requests</span></div>
+    <div class="pb"><div id="wishFeed"></div></div>
+  </div>
+  <div class="panel">
     <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
     <div class="pb" id="macroBox"></div>
   </div>
@@ -254,7 +277,7 @@ footer span{{color:var(--cyan)}}
     <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Activity Heartbeat</span></div>
     <div class="pb" id="pulseBox"></div>
   </div>
-  <div class="panel" style="grid-column: span 2">
+  <div class="panel" style="grid-column: 1 / -1">
     <div class="ph"><span>📠</span><span class="phtitle">Registro de Actividad</span><span class="phsub">Live Console Logs</span></div>
     <div class="pb"><div class="log-container" id="logBox"></div></div>
   </div>
@@ -305,7 +328,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 // Señales
 (()=>{{
   const el=document.getElementById('sigList'),s=D.signals||[];
-  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,7).map(x=>{{
+  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,10).map(x=>{{
     const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
     return `<div class="sitem"><div><div class="spair">${{x.pair}} <span class="ssent" title="Sentimiento: ${{Number(x.sentiment).toFixed(2)}}">${{sentIcon}}</span></div><div class="sts">${{fd(x.timestamp)}}</div></div><span class="dbadge d${{x.direction}}">${{x.direction}}</span><div class="sscore">${{f(x.score,1)}}/10</div></div>`;
   }}).join('');
@@ -317,7 +340,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   if(!t.length){{tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><p>Sin trades aún</p></div></td></tr>';return;}}
   tb.innerHTML=t.slice(0,12).map(x=>{{
     const p=x.pnl!=null?`<span class="tm" style="color:${{Number(x.pnl)>=0?'var(--green)':'var(--red)'}}">${{Number(x.pnl)>=0?'+':''}}$${{f(x.pnl)}}</span>`:'<span style="color:var(--muted)">—</span>';
-    return`<tr><td class="tm">${{x.pair}}</td><td><span class="badge b${{x.direction==='BUY'?'WIN':'LOSS'}}">${{x.direction}}</span></td><td class="tm">$${{f(x.open_price,4)}}</td><td>${{p}}</td><td><span class="badge b${{x.status}}">${{x.status}}</span></td><td style="color:var(--muted);font-size:11px">${{fd(x.open_time)}}</td></tr>`;
+    return`<tr><td class="tm">${{x.pair}}</td><td><span class="badge b${{x.direction==='BUY'?'WIN':'LOSS'}}">${{x.direction}}</span></td><td class="tm">$${{f(x.open_price,4)}}</td><td>${{p}}</td><td><span class="badge b${{status}}">${{x.status}}</span></td><td style="color:var(--muted);font-size:11px">${{fd(x.open_time)}}</td></tr>`;
   }}).join('');
 }})();
 
@@ -367,7 +390,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
       Sincronizado: ${{fd(m.timestamp)}}
     </div>
   `;
-}})();
+}}})();
 
 // Pulse
 (()=>{{
@@ -377,8 +400,34 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   el.innerHTML = hb.map(h => `
     <div class="pulse-item">
       <div><span class="pdot p${{h.status}}"></span><span style="font-weight:600">${{h.status}}</span></div>
-      <div style="color:var(--muted)">${{h.note}}</div>
+      <div style="color:var(--muted);font-size:9px">${{h.note}}</div>
       <div style="font-family:var(--mono);opacity:0.8">${{fd(h.timestamp).split(',')[1]}}</div>
+    </div>
+  `).join('');
+}})();
+
+// Bot Brain
+(()=>{{
+  const el=document.getElementById('brainFeed'), m=D.bot_memory||[];
+  if(!m.length){{el.innerHTML='<div class="empty">La IA aún no ha generado reflexiones...</div>';return;}}
+  el.innerHTML = m.map(x => `
+    <div class="brain-item">
+      <div class="brain-cat">${{x.category}}</div>
+      <div class="brain-impact i${{x.impact}}"></div>
+      <div class="brain-note">${{x.note}}</div>
+      <div style="font-size:8px;color:var(--muted);margin-top:6px">${{fd(x.timestamp)}}</div>
+    </div>
+  `).join('');
+}})();
+
+// Bot Wishes
+(()=>{{
+  const el=document.getElementById('wishFeed'), w=D.bot_wishes||[];
+  if(!w.length){{el.innerHTML='<div class="empty">No hay peticiones pendientes.</div>';return;}}
+  el.innerHTML = w.map(x => `
+    <div class="wish-item">
+      <div class="wish-icon">💡</div>
+      <div class="wish-text">${{x.wish}}</div>
     </div>
   `).join('');
 }})();

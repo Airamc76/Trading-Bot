@@ -88,6 +88,19 @@ CREATE TABLE IF NOT EXISTS macro_history (
     dxy_trend      TEXT,
     nasdaq_trend   TEXT
 );
+CREATE TABLE IF NOT EXISTS bot_memory (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT DEFAULT (datetime('now')),
+    category       TEXT, -- 'REFLECTION', 'PATTERN', 'STRATEGY'
+    note           TEXT,
+    impact         TEXT  -- 'POSITIVE', 'NEGATIVE', 'NEUTRAL'
+);
+CREATE TABLE IF NOT EXISTS bot_wishes (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT DEFAULT (datetime('now')),
+    wish           TEXT,
+    status         TEXT DEFAULT 'PENDING' -- 'PENDING', 'FULFILLED', 'IGNORED'
+);
 """
 
 
@@ -338,12 +351,14 @@ def get_dashboard_data() -> dict:
     trades  = d.query("SELECT t.*, f.lesson, f.performance_score FROM paper_trades t LEFT JOIN trade_feedback f ON t.id = f.trade_id ORDER BY t.id DESC LIMIT 30")
     bal_hist= d.query("SELECT timestamp,balance FROM portfolio ORDER BY id DESC LIMIT 60")
     macro   = get_latest_macro()
+    memory  = d.query("SELECT * FROM bot_memory ORDER BY id DESC LIMIT 10")
+    wishes  = d.query("SELECT * FROM bot_wishes WHERE status='PENDING' ORDER BY id DESC LIMIT 5")
 
-    balance = float(bal_r[0]["balance"]) if bal_r else 10000.0
+    balance_val = float(bal_r[0]["balance"]) if bal_r else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
 
     return {
-        "balance":         round(float(balance), 2),
+        "balance":         round(float(balance_val), 2),
         "total_pnl":       round(float(pnl_r), 2),
         "total_trades":    total,
         "wins":            wins,
@@ -356,6 +371,8 @@ def get_dashboard_data() -> dict:
         "macro":           macro,
         "heartbeats":      get_recent_heartbeats(),
         "system_logs":     get_recent_logs(),
+        "bot_memory":      memory,
+        "bot_wishes":      wishes,
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }
 
