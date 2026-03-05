@@ -128,6 +128,8 @@ tr:hover td{{background:rgba(0,229,255,.02)}}
 .bWIN{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.15)}}
 .bLOSS{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.15)}}
 .bOPEN{{background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.15)}}
+.bBUY{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.15)}}
+.bSELL{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.15)}}
 
 /* DONUT */
 .dw{{display:flex;align-items:center;gap:24px}}
@@ -340,7 +342,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   if(!t.length){{tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><p>Sin trades aún</p></div></td></tr>';return;}}
   tb.innerHTML=t.slice(0,12).map(x=>{{
     const p=x.pnl!=null?`<span class="tm" style="color:${{Number(x.pnl)>=0?'var(--green)':'var(--red)'}}">${{Number(x.pnl)>=0?'+':''}}$${{f(x.pnl)}}</span>`:'<span style="color:var(--muted)">—</span>';
-    return`<tr><td class="tm">${{x.pair}}</td><td><span class="badge b${{x.direction==='BUY'?'WIN':'LOSS'}}">${{x.direction}}</span></td><td class="tm">$${{f(x.open_price,4)}}</td><td>${{p}}</td><td><span class="badge b${{x.status}}">${{x.status}}</span></td><td style="color:var(--muted);font-size:11px">${{fd(x.open_time)}}</td></tr>`;
+    return`<tr><td class="tm">${{x.pair}}</td><td><span class="badge b${{x.direction}}">${{x.direction}}</span></td><td class="tm">$${{f(x.open_price,4)}}</td><td>${{p}}</td><td><span class="badge b${{x.status}}">${{x.status}}</span></td><td style="color:var(--muted);font-size:11px">${{fd(x.open_time)}}</td></tr>`;
   }}).join('');
 }})();
 
