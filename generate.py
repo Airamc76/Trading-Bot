@@ -13,7 +13,10 @@ from database import initialize_database, get_dashboard_data
 
 def generate():
     initialize_database()
+    from database import USE_TURSO
+    print(f"DEBUG: USE_TURSO={USE_TURSO}")
     data      = get_dashboard_data()
+    print(f"DEBUG: Trade count in data={len(data.get('trades', []))}")
     data_json = json.dumps(data, default=str, ensure_ascii=False)
     html      = build_html(data_json)
 
