@@ -66,7 +66,7 @@ def run_brain_reflection():
         HAVING total >= 3
     """)
     for p in pairs_stats:
-        if p["losses"] / p["total"] > 0.7:
+        if float(p["losses"]) / float(p["total"]) > 0.7:
             record_reflection(
                 "PATTERN",
                 f"El par {p['pair']} me está dando problemas constantes. Quizás no se adapta bien a mi lógica de scalping actual.",
