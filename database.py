@@ -95,6 +95,12 @@ CREATE TABLE IF NOT EXISTS bot_memory (
     note           TEXT,
     impact         TEXT  -- 'POSITIVE', 'NEGATIVE', 'NEUTRAL'
 );
+CREATE TABLE IF NOT EXISTS bot_config (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    key            TEXT UNIQUE,
+    value          TEXT,
+    updated_at     TEXT DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS bot_wishes (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
     timestamp      TEXT DEFAULT (datetime('now')),
@@ -247,6 +253,29 @@ def get_latest_macro():
     d = db()
     r = d.query("SELECT * FROM macro_history ORDER BY id DESC LIMIT 1")
     return r[0] if r else None
+
+def get_daily_pnl():
+    """Calcula el PnL total de los trades cerrados hoy."""
+    d = db()
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    res = d.query("SELECT SUM(pnl) as total FROM paper_trades WHERE close_time LIKE ?", [f"{today}%"])
+    return float(res[0]['total'] or 0.0)
+
+def get_bot_config(key, default=None):
+    """Obtiene un valor de configuración de la base de datos."""
+    d = db()
+    r = d.query("SELECT value FROM bot_config WHERE key = ?", [key])
+    return r[0]['value'] if r else default
+
+def set_bot_config(key, value):
+    """Guarda o actualiza un valor de configuración."""
+    d = db()
+    d.execute(
+        "INSERT INTO bot_config (key, value, updated_at) VALUES (?, ?, ?) "
+        "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+        [key, str(value), datetime.now(timezone.utc).isoformat()]
+    )
+    d.commit()
 
 def log_heartbeat(status: str, note: str = ""):
     d = db()

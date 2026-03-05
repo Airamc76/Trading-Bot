@@ -116,6 +116,7 @@ def run_cycle(dry_run: bool = False):
             "timeframe": config.PRIMARY_TIMEFRAME,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "price":     vals["price"],
+            "atr":       vals.get("atr"), # Pass ATR for Rule 6
         })
         all_signals.append(signal)
 
@@ -159,7 +160,16 @@ def run_cycle(dry_run: bool = False):
 
     # ── Abrir nuevos trades ───────────────────────────────────────
     if not dry_run and not event_near:
-        from database import get_bot_config
+        from database import get_bot_config, get_daily_pnl
+        
+        # APEX RULE 2: Daily Drawdown Limit (5%)
+        daily_pnl = get_daily_pnl()
+        max_daily_loss = broker.balance * 0.05
+        if daily_pnl < -max_daily_loss:
+            logger.warning(f"🚨 APEX CRITICAL: Daily drawdown limit reached (${daily_pnl:,.2f}). New trades PAUSED.")
+            send_telegram(f"🚨 <b>APEX Critical</b>: Límite de drawdown diario alcanzado (${daily_pnl:,.2f}).\nOperaciones pausadas por hoy.")
+            return
+
         dyn_min_score = float(get_bot_config("MIN_SCORE_TO_TRADE", config.MIN_SCORE_TO_TRADE))
         paused_pairs_str = get_bot_config("PAUSED_PAIRS", "")
         paused_pairs = paused_pairs_str.split(",") if paused_pairs_str else []
@@ -187,6 +197,7 @@ def run_cycle(dry_run: bool = False):
                 price       = signal["price"],
                 stop_loss   = signal.get("stop_loss"),
                 take_profit = signal.get("take_profit"),
+                atr         = signal.get("atr"), # Rule 6 Volatility
             )
             if trade_id:
                 r = signal.get("reasons", [])

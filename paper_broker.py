@@ -5,7 +5,8 @@ import logging
 from datetime import datetime, timezone
 import config
 from database import (get_portfolio_balance, update_portfolio,
-                       get_open_trades, open_paper_trade, close_paper_trade)
+                       get_open_trades, open_paper_trade, close_paper_trade,
+                       get_bot_config, get_dashboard_data)
 
 logger = logging.getLogger(__name__)
 
@@ -23,29 +24,50 @@ class PaperBroker:
         return get_open_trades()
 
     def can_open_trade(self):
-        from database import get_bot_config
         max_open = int(get_bot_config("MAX_OPEN_TRADES", config.MAX_OPEN_TRADES))
         return len(self.open_trades) < max_open
 
-    def _position_size(self, price, stop_loss):
-        from database import get_bot_config
+    def _position_size(self, price, stop_loss, atr=None):
         dyn_risk = float(get_bot_config("RISK_PER_TRADE", config.RISK_PER_TRADE))
         dyn_max_pct = float(get_bot_config("MAX_POSITION_SIZE_PCT", config.MAX_POSITION_SIZE_PCT))
         
-        risk = self.balance * dyn_risk
+        # APEX RULE 2: 1-2% risk per trade
+        risk_amount = self.balance * dyn_risk
+        
         if not stop_loss or price == 0:
-            return risk
-        dist = abs(price - stop_loss) / price
+            return risk_amount
+            
+        dist = abs(price - stop_loss)
+        dist_pct = dist / price
+        
+        # Calculate standard size (Size = Risk / Distance to SL)
+        # Note: We use distance in percentage to calculate size relative to balance
+        size = risk_amount / dist_pct if dist_pct > 0 else risk_amount
+        
+        # APEX RULE 6: Reduce size by 50% in high volatility (ATR > 2% of price as proxy)
+        if atr and (atr / price) > 0.02:
+            logger.info("⚠️ High volatility detected (ATR > 2%). Reducing position size by 50% per APEX Rule 6.")
+            size *= 0.5
+            
+        # Hard limit per trade to avoid overexposure
         max_size = self.balance * dyn_max_pct
-        size = risk / dist if dist else risk
         return min(size, max_size)
 
-    def open_trade(self, signal_id, pair, direction, price, stop_loss, take_profit):
+    def open_trade(self, signal_id, pair, direction, price, stop_loss, take_profit, atr=None):
         if not self.can_open_trade():
             return None
         if pair in [t["pair"] for t in self.open_trades]:
             return None
-        size = self._position_size(price, stop_loss)
+            
+        # APEX Rule: R:R must be at least 1:2
+        if stop_loss and take_profit:
+            risk = abs(price - stop_loss)
+            reward = abs(take_profit - price)
+            if risk > 0 and (reward / risk) < 1.9: # Allow a bit of margin for 2.0
+                logger.warning(f"🚫 Trade rejected for {pair}: R:R too low ({reward/risk:.2f})")
+                return None
+
+        size = self._position_size(price, stop_loss, atr)
         tid = open_paper_trade({
             "signal_id": signal_id, "pair": pair, "direction": direction,
             "open_time": datetime.now(timezone.utc).isoformat(), "open_price": price,
@@ -77,5 +99,4 @@ class PaperBroker:
         return closed
 
     def stats(self):
-        from database import get_dashboard_data
         return get_dashboard_data()
