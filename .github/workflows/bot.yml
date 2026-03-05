@@ -24,12 +24,14 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 jobs:
   run-bot:
-    name: Análisis y Paper Trading
+    name: Análisis, Paper Trading y Dashboard
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
 
     steps:
       - name: 📥 Checkout código
@@ -79,6 +81,14 @@ jobs:
           git commit -m "🤖 Auto-guardado de DB [skip ci]" || echo "No hay cambios para comitear"
           git push || echo "Error al pushear o sin acceso"
 
+      - name: 📈 Generar HTML
+        run: python generate.py
+
+      - name: 📤 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
       - name: 📊 Subir logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -86,3 +96,15 @@ jobs:
           name: bot-logs-${{ github.run_number }}
           path: logs/
           retention-days: 7
+
+  deploy-pages:
+    name: Deploy a GitHub Pages
+    needs: run-bot
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
