@@ -22,6 +22,9 @@ on:
           - dry-run
           - stats
 
+permissions:
+  contents: write
+
 jobs:
   run-bot:
     name: Análisis y Paper Trading
