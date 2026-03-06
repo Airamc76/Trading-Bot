@@ -16,6 +16,7 @@ import json
 import hashlib
 from datetime import datetime, timezone, timedelta
 from database import db, get_bot_config, set_bot_config
+from llm_brain import run_llm_brain_cycle
 
 logger = logging.getLogger(__name__)
 
@@ -535,6 +536,12 @@ def run_brain_reflection():
 def process_bot_brain():
     """Punto de entrada principal. Ejecutado al final de cada ciclo."""
     try:
+        # 1. Ejecutar reflexión basada en código (rápida, determinista)
         run_brain_reflection()
+
+        # 2. Ejecutar reflexión basada en LLM (intuitiva, estratégica)
+        # Solo corre si hay API keys y ha pasado el cooldown
+        run_llm_brain_cycle()
+
     except Exception as e:
-        logger.error(f"Error en el cerebro de la IA: {e}", exc_info=True)
+        logger.error(f"Error en el cerebro del bot: {e}", exc_info=True)
