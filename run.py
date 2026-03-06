@@ -89,7 +89,10 @@ def run_cycle(dry_run: bool = False):
     market_data = fetch_all_pairs(config.ALL_PAIRS, config.PRIMARY_TIMEFRAME, 200)
 
     if not market_data:
-        logger.error("❌ Sin datos de mercado — abortando")
+        msg = "❌ Sin datos de mercado (todas las fuentes fallaron) — abortando ciclo"
+        logger.error(msg)
+        log_heartbeat("ERROR", "Falla crítica en descarga de datos")
+        log_system_event("ERROR", msg)
         return
 
     logger.info(f"✅ {len(market_data)}/{len(config.ALL_PAIRS)} pares obtenidos")
@@ -165,14 +168,19 @@ def run_cycle(dry_run: bool = False):
         # APEX RULE 2: Daily Drawdown Limit (5%)
         daily_pnl = get_daily_pnl()
         max_daily_loss = broker.balance * 0.05
-        if daily_pnl < -max_daily_loss:
-            logger.warning(f"🚨 APEX CRITICAL: Daily drawdown limit reached (${daily_pnl:,.2f}). New trades PAUSED.")
-            send_telegram(f"🚨 <b>APEX Critical</b>: Límite de drawdown diario alcanzado (${daily_pnl:,.2f}).\nOperaciones pausadas por hoy.")
-            return
-
+        
+        # Recuperar configuración dinámica
         dyn_min_score = float(get_bot_config("MIN_SCORE_TO_TRADE", config.MIN_SCORE_TO_TRADE))
         paused_pairs_str = get_bot_config("PAUSED_PAIRS", "")
         paused_pairs = paused_pairs_str.split(",") if paused_pairs_str else []
+
+        if daily_pnl < -max_daily_loss:
+            msg = f"🚨 PAUSADO: Límite de drawdown diario alcanzado (${daily_pnl:,.2f})."
+            logger.warning(msg)
+            # Aún ejecutamos el cerebro para que el MD explique por qué está pausado
+            process_bot_brain()
+            log_heartbeat("PAUSED", msg)
+            return
 
         tradeable = sorted(
             [s for s in all_signals
