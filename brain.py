@@ -372,9 +372,9 @@ def _analyze_time_patterns(d):
         worst_wr = int(worst["wins"]) / int(worst["total"]) * 100
         _record_thought(
             "TIME_PATTERN",
-            f"Patrón temporal detectado: mi mejor rendimiento es a las {best['hour']:02d}h UTC "
+            f"Patrón temporal detectado: mi mejor rendimiento es a las {int(best['hour']):02d}h UTC "
             f"({best_wr:.0f}% WR, ${best['avg_pnl']:.2f}/trade). "
-            f"Peor hora: {worst['hour']:02d}h UTC ({worst_wr:.0f}% WR, ${worst['avg_pnl']:.2f}/trade). "
+            f"Peor hora: {int(worst['hour']):02d}h UTC ({worst_wr:.0f}% WR, ${worst['avg_pnl']:.2f}/trade). "
             f"Tendré esto en cuenta para calibrar mi confianza en cada sesión.",
             "NEUTRAL"
         )
