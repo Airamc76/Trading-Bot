@@ -164,6 +164,7 @@ Your response must follow this exact schema:
 }
 
 Rules:
+- Write the 'thought' and 'action_taken' fields ALWAYS in Spanish (Español). This is critical.
 - Your "thought" must reference SPECIFIC numbers from the data (win rate %, streak count, exact P&L)
 - Only change parameters if you have evidence-based justification
 - If win_rate is 0% over 5+ trades, be aggressive about changing strategy
