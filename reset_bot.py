@@ -59,8 +59,11 @@ def the_great_reset():
     logger.info("👔 El Managing Director está listo para su primera operación.")
 
 if __name__ == "__main__":
-    confirm = input("⚠️ ¿ESTÁS SEGURO? Esto borrará TODO el historial. (s/n): ")
-    if confirm.lower() == 's':
+    if os.getenv("FORCE_RESET") == "true":
         the_great_reset()
     else:
-        logger.info("❌ Reinicio cancelado.")
+        confirm = input("⚠️ ¿ESTÁS SEGURO? Esto borrará TODO el historial. (s/n): ")
+        if confirm.lower() == 's':
+            the_great_reset()
+        else:
+            logger.info("❌ Reinicio cancelado.")
