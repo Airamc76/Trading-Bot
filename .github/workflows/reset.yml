@@ -1,0 +1,59 @@
+name: 💥 RESET TOTAL (V2)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  reset-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 📦 Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: 💥 EJECTUAR REINICIO
+        env:
+          TURSO_URL: ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          FORCE_RESET: "true"
+        run: python reset_bot.py
+
+      - name: 🚀 Commit local db cleanup
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add db/local.db || echo "No local db"
+          git commit -m "🤖 Database Reset Sync [skip ci]" || echo "No changes"
+          git push origin main || echo "Push failed"
+
+      - name: 📈 Regenerar Dashboard Vacío
+        env:
+          TURSO_URL: ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: python generate.py
+
+      - name: 📤 Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy-pages:
+    needs: reset-bot
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 🚀 Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
