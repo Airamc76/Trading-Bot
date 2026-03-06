@@ -410,6 +410,13 @@ def get_dashboard_data() -> dict:
         "system_logs":     get_recent_logs(),
         "bot_memory":      memory,
         "bot_wishes":      wishes,
+        "bot_config": {
+            "strategy":      get_bot_config("ACTIVE_STRATEGY", "ALL"),
+            "min_score":     get_bot_config("MIN_SCORE_TO_TRADE", "5.0"),
+            "sl_atr":        get_bot_config("STOP_LOSS_ATR", "1.2"),
+            "paused":        get_bot_config("TRADING_PAUSED", "false") == "true",
+            "paused_pairs":  get_bot_config("PAUSED_PAIRS", "")
+        },
         "last_updated":    datetime.now(timezone.utc).isoformat(),
     }
 

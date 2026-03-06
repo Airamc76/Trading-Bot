@@ -211,6 +211,16 @@ footer span{{color:var(--cyan)}}
 .l-WARNING{{color:var(--gold)}}
 .l-ERROR{{color:var(--red)}}
 .log-msg{{color:rgba(255,255,255,0.9);word-break:break-word}}
+/* MD PANEL */
+.md-exec {{ background: linear-gradient(135deg, #0a1120, #0c1a30); border: 1px solid var(--cyan); border-radius: 10px; padding: 18px; position:relative; }}
+.md-role {{ font-family: var(--mono); color: var(--gold); font-size: 11px; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; }}
+.md-status {{ display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }}
+.md-state {{ font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; }}
+.md-thought {{ font-size: 12px; line-height: 1.5; color: #fff; margin-bottom: 15px; font-style: italic; border-left: 2px solid var(--gold); padding-left: 12px; }}
+.md-metrics {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
+.md-m {{ background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:8px; }}
+.md-mlv {{ font-size: 9px; color: var(--muted); margin-bottom: 2px; }}
+.md-mva {{ font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }}
 </style>
 </head>
 <body>
@@ -237,9 +247,9 @@ footer span{{color:var(--cyan)}}
     <div class="ph"><span>📈</span><span class="phtitle">Evolución del Balance</span><span class="phsub">demo USD</span></div>
     <div class="pb"><div class="cbox"><canvas id="balChart"></canvas></div></div>
   </div>
-  <div class="panel">
-    <div class="ph"><span>🔔</span><span class="phtitle">Últimas Señales</span></div>
-    <div class="pb"><div class="slist" id="sigList"></div></div>
+  <div class="md-exec">
+    <div class="md-role">👤 MANAGING DIRECTOR (MD)</div>
+    <div id="mdSummary"></div>
   </div>
 </div>
 
@@ -254,6 +264,10 @@ footer span{{color:var(--cyan)}}
     </div>
   </div>
   <div class="panel">
+    <div class="ph"><span>🔔</span><span class="phtitle">Últimas Señales</span></div>
+    <div class="pb"><div class="slist" id="sigList"></div></div>
+  </div>
+  <div class="panel">
     <div class="ph"><span>🎯</span><span class="phtitle">Win Rate</span></div>
     <div class="pb">
       <div class="dw">
@@ -263,11 +277,11 @@ footer span{{color:var(--cyan)}}
     </div>
   </div>
   <div class="panel">
-    <div class="ph"><span>🧠</span><span class="phtitle">Diario de Aprendizaje</span><span class="phsub">Feedback Engine</span></div>
-    <div class="pb"><div id="lessonFeed"></div></div>
+    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
+    <div class="pb" id="macroBox"></div>
   </div>
   <div class="panel">
-    <div class="ph"><span>📠</span><span class="phtitle">Cerebro del Bot</span><span class="phsub">IA Consciousness</span></div>
+    <div class="ph"><span>🧠</span><span class="phtitle">Memoria de Corto Plazo</span><span class="phsub">IA Reasoning Log</span></div>
     <div class="pb"><div id="brainFeed"></div></div>
   </div>
   <div class="panel">
@@ -275,11 +289,11 @@ footer span{{color:var(--cyan)}}
     <div class="pb"><div id="wishFeed"></div></div>
   </div>
   <div class="panel">
-    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
-    <div class="pb" id="macroBox"></div>
+    <div class="ph"><span>🎯</span><span class="phtitle">Análisis de Feedback</span><span class="phsub">Post-Mortem Engine</span></div>
+    <div class="pb"><div id="lessonFeed"></div></div>
   </div>
   <div class="panel">
-    <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Activity Heartbeat</span></div>
+    <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Heartbeat</span></div>
     <div class="pb" id="pulseBox"></div>
   </div>
   <div class="panel" style="grid-column: 1 / -1">
@@ -411,15 +425,38 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   `).join('');
 }})();
 
-// Bot Brain
+// Bot Brain MD Summary
+(()=>{{
+  const el=document.getElementById('mdSummary'), m=D.bot_memory||[], c=D.bot_config||{{}};
+  const lastLLM = m.find(x => x.category === 'LLM_REASONING');
+  const thought = lastLLM ? lastLLM.note.replace(/^\[.*?\]\s*/, '') : 'El Managing Director está analizando los datos actuales del mercado...';
+  const model = lastLLM ? (lastLLM.note.match(/^\[(.*?)\]/) || [null, 'IA'])[1] : 'MD';
+
+  el.innerHTML = `
+    <div class="md-status">
+      <span class="md-state b${{c.paused?'LOSS':'WIN'}}">${{c.paused?'PAUSADO':'OPERATIVO'}}</span>
+      <span class="md-state dNEUTRAL" style="color:var(--gold)">${{model}}</span>
+      <span class="hts" style="margin-left:auto">${{lastLLM ? fd(lastLLM.timestamp).split(',')[1] : ''}}</span>
+    </div>
+    <div class="md-thought">"${{thought}}"</div>
+    <div class="md-metrics">
+      <div class="md-m"><div class="md-mlv">ESTRATEGIA</div><div class="md-mva">${{c.strategy}}</div></div>
+      <div class="md-m"><div class="md-mlv">SCORE MÍN</div><div class="md-mva">${{f(c.min_score,1)}}/10</div></div>
+      <div class="md-m"><div class="md-mlv">STOP LOSS</div><div class="md-mva">${{f(c.sl_atr,2)}}x ATR</div></div>
+      <div class="md-m"><div class="md-mlv">PARES PAUS.</div><div class="md-mva">${{c.paused_pairs ? c.paused_pairs.split(',').length : 0}}</div></div>
+    </div>
+  `;
+}})();
+
+// Bot Brain History
 (()=>{{
   const el=document.getElementById('brainFeed'), m=D.bot_memory||[];
   if(!m.length){{el.innerHTML='<div class="empty">La IA aún no ha generado reflexiones...</div>';return;}}
-  el.innerHTML = m.map(x => `
+  el.innerHTML = m.slice(0, 8).map(x => `
     <div class="brain-item">
       <div class="brain-cat">${{x.category}}</div>
       <div class="brain-impact i${{x.impact}}"></div>
-      <div class="brain-note">${{x.note}}</div>
+      <div class="brain-note" style="color:${{x.category==='LLM_REASONING'?'var(--cyan)':'#eee'}}">${{x.note}}</div>
       <div style="font-size:8px;color:var(--muted);margin-top:6px">${{fd(x.timestamp)}}</div>
     </div>
   `).join('');
