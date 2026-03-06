@@ -107,11 +107,13 @@ CREATE TABLE IF NOT EXISTS bot_wishes (
     wish           TEXT,
     status         TEXT DEFAULT 'PENDING' -- 'PENDING', 'FULFILLED', 'IGNORED', 'ACTION'
 );
-CREATE TABLE IF NOT EXISTS bot_config (
+CREATE TABLE IF NOT EXISTS strategy_performance (
     id             INTEGER PRIMARY KEY AUTOINCREMENT,
-    key            TEXT UNIQUE,
-    value          TEXT,
-    updated_at     TEXT DEFAULT (datetime('now'))
+    strategy       TEXT NOT NULL,
+    pair           TEXT,
+    result         TEXT,
+    pnl            REAL,
+    timestamp      TEXT DEFAULT (datetime('now'))
 );
 """
 
