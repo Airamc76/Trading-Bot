@@ -424,24 +424,27 @@ def _should_run_llm() -> bool:
 # ── Punto de entrada ──────────────────────────────────────────────────────────
 
 def run_llm_brain_cycle():
-    """Ejecuta el ciclo de razonamiento LLM priorizando OpenAI -> Groq -> Gemini."""
+    """Ejecuta el ciclo de razonamiento LLM priorizando Groq -> Gemini -> OpenAI."""
     if not _should_run_llm():
         return
 
     context = _build_context_snapshot()
     decision = None
 
-    if OPENAI_API_KEY:
-        logger.info(f"🤖 LLM Brain: solicitando razonamiento a {OPENAI_MODEL}...")
-        decision = _call_openai(context)
-    
-    if decision is None and GROQ_API_KEY:
+    # Prioridad 1: Groq (ultra-rápido y gratuito — modelo principal)
+    if GROQ_API_KEY:
         logger.info(f"🤖 LLM Brain: solicitando razonamiento a {GROQ_MODEL}...")
         decision = _call_groq(context)
 
+    # Prioridad 2: Gemini (gratuito con cuota generosa)
     if decision is None and GEMINI_API_KEY:
         logger.info("🤖 LLM Brain: solicitando razonamiento a Gemini Flash...")
         decision = _call_gemini(context)
+
+    # Prioridad 3: OpenAI (último recurso — tiene límites de solicitudes)
+    if decision is None and OPENAI_API_KEY:
+        logger.info(f"🤖 LLM Brain: solicitando razonamiento a {OPENAI_MODEL} (fallback)...")
+        decision = _call_openai(context)
 
     if decision:
         try:

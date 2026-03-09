@@ -260,6 +260,23 @@ def show_stats():
 
 if __name__ == "__main__":
     mode = os.getenv("BOT_MODE", "cycle")
-    if   mode == "stats":    show_stats()
-    elif mode == "dry-run":  run_cycle(dry_run=True)
-    else:                    run_cycle(dry_run=False)
+    try:
+        if   mode == "stats":    show_stats()
+        elif mode == "dry-run":  run_cycle(dry_run=True)
+        else:                    run_cycle(dry_run=False)
+    except Exception as _fatal:
+        _msg = f"💥 Error fatal en el bot: {_fatal}"
+        logger.error(_msg, exc_info=True)
+        # Intentar notificar
+        try:
+            from database import initialize_database, log_system_event
+            initialize_database()
+            log_system_event("CRITICAL", _msg)
+        except Exception:
+            pass
+        try:
+            send_telegram(f"🚨 <b>Bot detenido por error crítico</b>\n<code>{_fatal}</code>")
+        except Exception:
+            pass
+        # Salir con código 0 para que GitHub Actions no bloquee el dashboard
+        sys.exit(0)
