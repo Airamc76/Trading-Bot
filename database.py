@@ -127,7 +127,13 @@ class TursoClient:
 
     def __init__(self, url: str, token: str):
         import requests
+        from requests.adapters import HTTPAdapter
+        from urllib3.util.retry import Retry
         self.session = requests.Session()
+        # Reintentos a nivel de TCP (errores de conexión, no de timeout de lectura)
+        retry = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retry)
+        self.session.mount("https://", adapter)
         # Convertir URL de libsql:// a https://
         self.base = url.replace("libsql://", "https://") + "/v2/pipeline"
         self.headers = {
@@ -147,22 +153,46 @@ class TursoClient:
         self._pending.append(stmt)
 
     def commit(self):
-        """Envía todos los statements pendientes en una sola llamada HTTP."""
+        """Envía todos los statements pendientes en una sola llamada HTTP con reintentos."""
         if not self._pending:
             return []
+        import requests, time
         payload = {"requests": self._pending + [{"type": "close"}]}
-        import requests
-        resp = self.session.post(self.base, json=payload, headers=self.headers, timeout=60)
-        resp.raise_for_status()
-        results = resp.json().get("results", [])
+        last_err = None
+        for attempt in range(3):
+            try:
+                # timeout=(connect, read): falla rápido en conexión, 45s para leer
+                resp = self.session.post(
+                    self.base, json=payload, headers=self.headers,
+                    timeout=(10, 45)
+                )
+                resp.raise_for_status()
+                results = resp.json().get("results", [])
+                self._pending = []
+                return results
+            except requests.exceptions.Timeout as e:
+                last_err = e
+                wait = 2 ** attempt  # 1s, 2s, 4s
+                logger.warning(f"⚠️ Turso timeout (intento {attempt+1}/3), reintentando en {wait}s…")
+                time.sleep(wait)
+            except requests.exceptions.RequestException as e:
+                last_err = e
+                logger.warning(f"⚠️ Turso error de red (intento {attempt+1}/3): {e}")
+                time.sleep(2 ** attempt)
+        # Todos los intentos fallaron — limpiar batch y propagar
         self._pending = []
-        return results
+        logger.error(f"❌ Turso: todos los reintentos fallaron — {last_err}")
+        raise last_err or RuntimeError("Turso: falló sin excepción registrada")
 
     def query(self, sql: str, params: list = None) -> list:
         """Ejecuta una consulta y devuelve lista de dicts."""
         self._pending = []  # limpiar batch
         self.execute(sql, params)
-        results = self.commit()
+        try:
+            results = self.commit()
+        except Exception as e:
+            logger.error(f"❌ Turso query falló: {e} | SQL: {sql[:80]}")
+            return []
         if not results or results[0].get("type") == "error":
             return []
         rows_data = results[0].get("response", {}).get("result", {})
