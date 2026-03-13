@@ -34,9 +34,8 @@ def build_html(data_json: str, data: dict) -> str:
     # --- PROCESAMIENTO EN PYTHON (Evita backslashes en el f-string) ---
     health = data.get("health", {})
     status = health.get("status", "OK")
-    h_class = "status-ok" if status == "OK" else ("status-warning" if status == "WARNING" else "status-down")
-    h_icon = "✅" if status == "OK" else ("⚠️" if status == "WARNING" else "🛑")
-    h_text = "SISTEMA SALUDABLE" if status == "OK" else ("ADVERTENCIA" if status == "WARNING" else "BOT DESCONECTADO")
+    h_class = status # OK, WARNING, DOWN
+    h_text = "SISTEMA SALUDABLE" if status == "OK" else ("AVISO DE RED" if status == "WARNING" else "BOT DESCONECTADO")
     
     last_hb = health.get("last_heartbeat", "---")
     if last_hb and "T" in last_hb:
@@ -131,33 +130,6 @@ body::after{{
 .live::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}}
 @keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 6px var(--green)}}50%{{opacity:.2;box-shadow:none}}}}
 
-/* System Health Panel */
-.status-panel {{
-    border-left: 6px solid #4ade80;
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-    background: rgba(255,255,255,0.05);
-    margin-bottom: 25px;
-    padding: 20px;
-    border-radius: 4px;
-}}
-.status-ok {{ border-left-color: #4ade80; }}
-.status-warning {{ border-left-color: #fbbf24; background: rgba(251, 191, 36, 0.05); }}
-.status-down {{ border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); animation: pulse-red 2s infinite; }}
-
-.status-header {{ display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1em; }}
-.status-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }}
-.status-item {{ display: flex; flex-direction: column; }}
-.status-label {{ font-size: 0.85em; opacity: 0.7; color: var(--muted); }}
-.status-value {{ font-family: var(--mono); font-weight: 600; font-size: 1.05em; color: var(--text); }}
-
-@keyframes pulse-red {{
-    0% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }}
-    70% {{ box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }}
-    100% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
-}}
-
 /* KPIs */
 .kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}}
 @media(max-width:900px){{.kpis{{grid-template-columns:repeat(2,1fr)}}}}
@@ -185,19 +157,6 @@ body::after{{
 
 /* CHART */
 .cbox{{height:200px;position:relative}}
-
-/* SIGNALS */
-.slist{{display:flex;flex-direction:column;gap:7px}}
-.sitem{{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--s1);border:1px solid var(--border);border-radius:8px;transition:border-color .15s}}
-.sitem:hover{{border-color:var(--cyan)}}
-.spair{{font-family:var(--mono);font-size:13px;font-weight:700}}
-.sts{{font-size:10px;color:var(--muted);margin-top:2px}}
-.dbadge{{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 10px;border-radius:4px;letter-spacing:.5px}}
-.dBUY{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.2)}}
-.dSELL{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.2)}}
-.dNEUTRAL{{background:rgba(61,90,122,.2);color:var(--muted);border:1px solid var(--border)}}
-.sscore{{font-family:var(--mono);font-size:13px;color:var(--gold);font-weight:600}}
-.ssent{{font-size:10px;margin-left:8px}}
 
 /* TABLE */
 .tw{{overflow-x:auto}}
@@ -247,6 +206,31 @@ footer span{{color:var(--cyan)}}
 .rHIGH{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid var(--green)}}
 .rLOW{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}}
 .rNEUTRAL{{background:var(--s1);color:var(--muted);border:1px solid var(--border)}}
+
+/* HEALTH PANEL PREMIUM */
+.health-panel {{
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}}
+.hp-status {{ display: flex; align-items: center; gap: 12px; padding-right: 24px; border-right: 1px solid rgba(255,255,255,0.1); }}
+.hp-indicator {{ width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 10px currentColor; background: currentColor; }}
+.hp-label {{ font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1px; }}
+.hp-metrics {{ flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }}
+.hpm-item {{ display: flex; flex-direction: column; }}
+.hpm-value {{ font-family: var(--mono); font-size: 16px; font-weight: 700; color: #eee; }}
+.hpm-label {{ font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }}
+
+.sOK {{ color: var(--green); }}
+.sWARNING {{ color: var(--gold); }}
+.sDOWN {{ color: var(--red); }}
 
 /* BRAIN */
 .brain-item{{padding:12px;border-bottom:1px solid var(--border);position:relative}}
@@ -354,23 +338,24 @@ footer span{{color:var(--cyan)}}
 </header>
 
 {signal_only_html}
-<div class="card status-panel {h_class}">
-    <div class="status-header">
-        <span class="status-icon">{h_icon}</span>
-        <span class="status-text">{h_text}</span>
+
+<div class="health-panel">
+    <div class="hp-status s{h_class}">
+        <div class="hp-indicator"></div>
+        <div class="hp-label">{h_text}</div>
     </div>
-    <div class="status-grid">
-        <div class="status-item">
-            <span class="status-label">Heartbeat:</span>
-            <span class="status-value">{last_hb}</span>
+    <div class="hp-metrics">
+        <div class="hpm-item">
+            <div class="hpm-label">Latiendo</div>
+            <div class="hpm-value">{last_hb}</div>
         </div>
-        <div class="status-item">
-            <span class="status-label">Fallos (24h):</span>
-            <span class="status-value">{err_24h}</span>
+        <div class="hpm-item">
+            <div class="hpm-label">Reintentos/Fallos</div>
+            <div class="hpm-value">{err_24h}</div>
         </div>
-        <div class="status-item">
-            <span class="status-label">Acciones IA (24h):</span>
-            <span class="status-value">{act_24h}</span>
+        <div class="hpm-item">
+            <div class="hpm-label">Acciones Autónomas</div>
+            <div class="hpm-value">{act_24h}</div>
         </div>
     </div>
 </div>
@@ -410,10 +395,6 @@ footer span{{color:var(--cyan)}}
         <tbody id="tbody"></tbody>
       </table>
     </div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🔔</span><span class="phtitle">Últimas Señales</span></div>
-    <div class="pb"><div class="slist" id="sigList"></div></div>
   </div>
   <div class="panel">
     <div class="ph"><span>🎯</span><span class="phtitle">Win Rate</span></div>
@@ -511,14 +492,6 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   new Chart(document.getElementById('balChart'),{{type:'line',data:{{labels:h.map(x=>fd(x.timestamp)),datasets:[{{data:h.map(x=>parseFloat(x.balance)),borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.05)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.4}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{x:{{display:false}},y:{{grid:{{color:'rgba(22,36,58,1)'}},ticks:{{color:'#3d5a7a',font:{{family:'IBM Plex Mono',size:10}},callback:v=>'$'+v.toLocaleString()}}}}}}}}}});
 }})();
 
-// Señales
-(()=>{{
-  const el=document.getElementById('sigList'),s=D.signals||[];
-  el.innerHTML=!s.length?'<div class="empty"><div class="empty-icon">📡</div><p>Esperando señales...</p></div>':s.slice(0,10).map(x=>{{
-    const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
-    return `<div class="sitem"><div><div class="spair">${{x.pair}} <span class="ssent" title="Sentimiento: ${{Number(x.sentiment).toFixed(2)}}">${{sentIcon}}</span></div><div class="sts">${{fd(x.timestamp)}}</div></div><span class="dbadge d${{x.direction}}">${{x.direction}}</span><div class="sscore">${{f(x.score,1)}}/10</div></div>`;
-  }}).join('');
-}})();
 
 // Trades
 (()=>{{

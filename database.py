@@ -170,10 +170,10 @@ class TursoClient:
         last_err = None
         for attempt in range(3):
             try:
-                # timeout=(connect, read): falla rápido en conexión, 45s para leer
+                # timeout=(connect, read): falla rápido en conexión, 60s para leer
                 resp = self.session.post(
                     self.base, json=payload, headers=self.headers,
-                    timeout=(10, 45)
+                    timeout=(15, 60)
                 )
                 resp.raise_for_status()
                 results = resp.json().get("results", [])
