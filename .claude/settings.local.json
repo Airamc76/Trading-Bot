@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\Airam\\\\Desktop\\\\Trading-Bot\" && python -c \"import improvement_engine; print\\('improvement_engine OK'\\)\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Airam\\\\Desktop\\\\Trading-Bot\" && python -c \"\nimport database; print\\('database OK'\\)\nimport brain; print\\('brain OK'\\)\nimport macro_analyzer; print\\('macro_analyzer OK'\\)\nimport run; print\\('run OK'\\)\n\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Airam\\\\Desktop\\\\Trading-Bot\" && python -c \"import generate; generate.generate\\(\\)\" 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\Airam\\\\Desktop\\\\Trading-Bot\" && python -c \"\nimport sys\nsys.stdout.reconfigure\\(encoding='utf-8'\\)\nimport generate\ngenerate.generate\\(\\)\n\" 2>&1 | head -10)",
+      "Bash(cd \"C:\\\\Users\\\\Airam\\\\Desktop\\\\Trading-Bot\" && python -c \"\nimport sys; sys.stdout.reconfigure\\(encoding='utf-8'\\)\nimport logging; logging.basicConfig\\(level=logging.INFO\\)\nfrom improvement_engine import run_improvement_engine\nrun_improvement_engine\\(\\)\nfrom database import get_improvement_requests\nreqs = get_improvement_requests\\(\\)\nprint\\(f'Solicitudes generadas: {len\\(reqs\\)}'\\)\nfor r in reqs:\n    print\\(f'  [{r[\\\\\"priority\\\\\"]}] {r[\\\\\"title\\\\\"]}'\\)\n\" 2>&1)"
+    ]
+  }
+}
