@@ -115,6 +115,15 @@ CREATE TABLE IF NOT EXISTS strategy_performance (
     pnl            REAL,
     timestamp      TEXT DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS bot_improvement_requests (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp      TEXT DEFAULT (datetime('now')),
+    category       TEXT,   -- 'CONFIG', 'FEATURE', 'STRATEGY_INSIGHT', 'DATA_ISSUE'
+    priority       TEXT,   -- 'HIGH', 'MEDIUM', 'LOW'
+    title          TEXT,
+    description    TEXT,
+    status         TEXT DEFAULT 'PENDING'  -- 'PENDING', 'ACKNOWLEDGED', 'IMPLEMENTED'
+);
 """
 
 
@@ -448,6 +457,12 @@ def get_dashboard_data() -> dict:
     balance_val = float(bal_r[0]["balance"]) if bal_r else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
 
+    # Nuevos datos para paneles avanzados
+    improvement_requests = get_improvement_requests(8)
+    strategy_perf        = get_strategy_performance()
+    monthly_metrics_data = get_monthly_metrics()
+    signal_only_mode     = get_bot_config("SIGNAL_ONLY_MODE", "false") == "true"
+
     return {
         "balance":         round(float(balance_val), 2),
         "total_pnl":       round(float(pnl_r), 2),
@@ -464,6 +479,10 @@ def get_dashboard_data() -> dict:
         "system_logs":     get_recent_logs(),
         "bot_memory":      memory,
         "bot_wishes":      wishes,
+        "improvement_requests": improvement_requests,
+        "strategy_performance": strategy_perf,
+        "monthly_metrics":      monthly_metrics_data,
+        "signal_only_mode":     signal_only_mode,
         "health": {
             "status": "DOWN" if is_down else ("WARNING" if err_24h > 0 else "OK"),
             "errors_24h": int(err_24h),
@@ -475,10 +494,107 @@ def get_dashboard_data() -> dict:
             "min_score":     get_bot_config("MIN_SCORE_TO_TRADE", "5.0"),
             "sl_atr":        get_bot_config("STOP_LOSS_ATR", "1.2"),
             "paused":        get_bot_config("TRADING_PAUSED", "false") == "true",
-            "paused_pairs":  get_bot_config("PAUSED_PAIRS", "")
+            "paused_pairs":  get_bot_config("PAUSED_PAIRS", ""),
+            "signal_only":   signal_only_mode,
         },
         "last_updated":    now_utc.isoformat(),
     }
+
+
+def get_improvement_requests(limit=10) -> list:
+    """Obtiene las solicitudes de mejora más recientes para el dashboard."""
+    return db().query(
+        "SELECT * FROM bot_improvement_requests ORDER BY "
+        "CASE priority WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, "
+        "id DESC LIMIT ?",
+        [limit]
+    )
+
+
+def get_strategy_performance() -> list:
+    """Obtiene el rendimiento agregado por estrategia (últimos 30 días)."""
+    return db().query("""
+        SELECT strategy,
+               COUNT(*) as total,
+               SUM(CASE WHEN result='WIN' THEN 1 ELSE 0 END) as wins,
+               SUM(CASE WHEN result='LOSS' THEN 1 ELSE 0 END) as losses,
+               ROUND(SUM(CAST(pnl AS REAL)), 2) as total_pnl,
+               ROUND(AVG(CAST(pnl AS REAL)), 2) as avg_pnl
+        FROM strategy_performance
+        WHERE timestamp > datetime('now', '-30 days')
+        GROUP BY strategy
+        ORDER BY total_pnl DESC
+    """)
+
+
+def get_monthly_metrics() -> list:
+    """Obtiene las métricas mensuales históricas."""
+    return db().query(
+        "SELECT * FROM monthly_metrics ORDER BY month DESC LIMIT 6"
+    )
+
+
+def update_monthly_metrics():
+    """Calcula y guarda/actualiza las métricas del mes actual."""
+    d = db()
+    month_key = datetime.now(timezone.utc).strftime("%Y-%m")
+
+    try:
+        trades = d.query(
+            "SELECT status, pnl, pair FROM paper_trades "
+            "WHERE status != 'OPEN' AND close_time LIKE ?",
+            [f"{month_key}%"]
+        )
+        if not trades:
+            return
+
+        total  = len(trades)
+        wins   = [t for t in trades if t["status"] == "WIN"]
+        losses = [t for t in trades if t["status"] == "LOSS"]
+        total_pnl = sum(float(t["pnl"] or 0) for t in trades)
+        win_rate  = len(wins) / total * 100 if total > 0 else 0
+
+        pair_pnl = {}
+        for t in trades:
+            pair_pnl[t["pair"]] = pair_pnl.get(t["pair"], 0) + float(t["pnl"] or 0)
+        best_pair  = max(pair_pnl, key=pair_pnl.get) if pair_pnl else ""
+        worst_pair = min(pair_pnl, key=pair_pnl.get) if pair_pnl else ""
+
+        bal_rows = d.query(
+            "SELECT balance FROM portfolio WHERE timestamp LIKE ? ORDER BY id ASC",
+            [f"{month_key}%"]
+        )
+        balances = [float(r["balance"]) for r in bal_rows if r.get("balance")]
+        max_dd = 0.0
+        if balances:
+            peak = balances[0]
+            for b in balances:
+                peak = max(peak, b)
+                dd = (peak - b) / peak * 100 if peak > 0 else 0
+                max_dd = max(max_dd, dd)
+
+        d.execute(
+            "INSERT INTO monthly_metrics "
+            "(month, total_trades, winning_trades, losing_trades, win_rate, "
+            " total_pnl, max_drawdown, best_pair, worst_pair) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(month) DO UPDATE SET "
+            "total_trades=excluded.total_trades, "
+            "winning_trades=excluded.winning_trades, "
+            "losing_trades=excluded.losing_trades, "
+            "win_rate=excluded.win_rate, "
+            "total_pnl=excluded.total_pnl, "
+            "max_drawdown=excluded.max_drawdown, "
+            "best_pair=excluded.best_pair, "
+            "worst_pair=excluded.worst_pair",
+            [month_key, total, len(wins), len(losses),
+             round(win_rate, 1), round(total_pnl, 2),
+             round(max_dd, 1), best_pair, worst_pair]
+        )
+        d.commit()
+        logger.debug(f"📅 Métricas mensuales actualizadas: {month_key}")
+    except Exception as e:
+        logger.warning(f"update_monthly_metrics: {e}")
 
 
 def get_latest_signals(limit=10):

@@ -67,8 +67,21 @@ def build_html(data_json: str, data: dict) -> str:
             md_time = ts.split("T")[1][:5]
 
     config = data.get("bot_config", {})
-    is_paused = config.get("paused", False)
+    is_paused       = config.get("paused", False)
+    is_signal_only  = config.get("signal_only", False)
     paused_pairs_count = len(config.get("paused_pairs", "").split(",")) if config.get("paused_pairs") else 0
+
+    # Banner modo señal
+    signal_only_html = ""
+    if is_signal_only:
+        signal_only_html = """
+<div class="signal-only-banner">
+  <div class="sob-icon">📊</div>
+  <div>
+    <div class="sob-text">MODO SEÑAL ACTIVO — Trading Manual</div>
+    <div class="sob-sub">El bot NO ejecuta trades automáticamente. Las señales se envían por Telegram para que las operes tú manualmente.</div>
+  </div>
+</div>"""
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -289,6 +302,38 @@ footer span{{color:var(--cyan)}}
 .md-m {{ background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:8px; }}
 .md-mlv {{ font-size: 9px; color: var(--muted); margin-bottom: 2px; }}
 .md-mva {{ font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }}
+
+/* IMPROVEMENT REQUESTS */
+.imp-item {{ border-left: 3px solid var(--muted); padding: 10px 14px; margin-bottom: 8px; background: rgba(255,255,255,0.02); border-radius: 0 6px 6px 0; }}
+.imp-HIGH {{ border-left-color: var(--red); }}
+.imp-MEDIUM {{ border-left-color: var(--gold); }}
+.imp-LOW {{ border-left-color: var(--cyan); }}
+.imp-header {{ display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }}
+.imp-priority {{ font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }}
+.pHIGH {{ background:rgba(255,59,92,.15); color:var(--red); }}
+.pMEDIUM {{ background:rgba(255,208,0,.15); color:var(--gold); }}
+.pLOW {{ background:rgba(0,229,255,.15); color:var(--cyan); }}
+.imp-cat {{ font-size: 9px; color: var(--muted); font-family: var(--mono); }}
+.imp-title {{ font-size: 12px; font-weight: 600; color: var(--text); }}
+.imp-desc {{ font-size: 10px; color: rgba(200,216,232,0.7); line-height: 1.5; margin-top: 4px; }}
+
+/* STRATEGY PERFORMANCE */
+.strat-row {{ display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; }}
+.strat-row:last-child {{ border-bottom: none; }}
+.strat-name {{ font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--cyan); }}
+.strat-wr {{ font-family: var(--mono); font-size: 11px; }}
+.strat-pnl {{ font-family: var(--mono); font-weight: 600; }}
+
+/* MONTHLY METRICS */
+.monthly-table {{ width:100%; border-collapse:collapse; font-size:11px; }}
+.monthly-table th {{ padding:7px 12px; font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); background:var(--s1); text-align:left; }}
+.monthly-table td {{ padding:9px 12px; border-bottom:1px solid rgba(22,36,58,.6); }}
+
+/* SIGNAL ONLY BADGE */
+.signal-only-banner {{ background: linear-gradient(135deg, rgba(255,208,0,0.1), rgba(255,208,0,0.05)); border: 1px solid var(--gold); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }}
+.signal-only-banner .sob-icon {{ font-size: 20px; }}
+.signal-only-banner .sob-text {{ font-family: var(--mono); font-size: 12px; color: var(--gold); font-weight: 700; }}
+.signal-only-banner .sob-sub {{ font-size: 10px; color: var(--muted); }}
 </style>
 </head>
 <body>
@@ -308,6 +353,7 @@ footer span{{color:var(--cyan)}}
   </div>
 </header>
 
+{signal_only_html}
 <div class="card status-panel {h_class}">
     <div class="status-header">
         <span class="status-icon">{h_icon}</span>
@@ -397,6 +443,25 @@ footer span{{color:var(--cyan)}}
   <div class="panel">
     <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Heartbeat</span></div>
     <div class="pb" id="pulseBox"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🔬</span><span class="phtitle">Rendimiento por Estrategia</span><span class="phsub">Últimos 30 días</span></div>
+    <div class="pb" id="stratBox"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>💡</span><span class="phtitle">Solicitudes de Mejora</span><span class="phsub">El bot te pide ayuda</span></div>
+    <div class="pb" id="improvBox"></div>
+  </div>
+  <div class="panel" style="grid-column: 1 / -1">
+    <div class="ph"><span>📅</span><span class="phtitle">Métricas Mensuales</span><span class="phsub">Rendimiento histórico por mes</span></div>
+    <div class="pb">
+      <div class="tw">
+        <table class="monthly-table">
+          <thead><tr><th>Mes</th><th>Trades</th><th>Win %</th><th>P&amp;L</th><th>Max DD</th><th>Mejor Par</th><th>Peor Par</th></tr></thead>
+          <tbody id="monthlyTbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
   <div class="panel" style="grid-column: 1 / -1">
     <div class="ph"><span>📠</span><span class="phtitle">Registro de Actividad</span><span class="phsub">Live Console Logs</span></div>
@@ -557,7 +622,6 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 (()=>{{
   const el=document.getElementById('logBox'), logs=D.system_logs||[];
   if(!logs.length){{el.innerHTML='<div class="empty">Esperando registros...</div>';return;}}
-  
   el.innerHTML = logs.map(l => `
     <div class="log-line">
       <div class="log-ts">${{fd(l.timestamp).split(',')[1]}}</div>
@@ -565,6 +629,76 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
       <div class="log-msg">${{l.message}}</div>
     </div>
   `).join('');
+}})();
+
+// Strategy Performance
+(()=>{{
+  const el=document.getElementById('stratBox'), s=D.strategy_performance||[];
+  if(!s.length){{
+    el.innerHTML='<div class="empty"><div class="empty-icon">🔬</div><p>Sin datos de estrategia aún.<br><small>Se genera al cerrar los primeros trades.</small></p></div>';
+    return;
+  }}
+  el.innerHTML = s.map(x=>{{
+    const total=parseInt(x.total)||0, wins=parseInt(x.wins)||0;
+    const wr = total>0? (wins/total*100).toFixed(0) : 0;
+    const pnl = parseFloat(x.total_pnl)||0;
+    const pnlColor = pnl>=0?'var(--green)':'var(--red)';
+    const wrColor  = wr>=50?'var(--green)':wr>=35?'var(--gold)':'var(--red)';
+    const nameMap = {{'B_EMA_PULLBACK':'EMA Pullback','R_RSI_EXTREME':'RSI Extremo','M_MACD_MOMENTUM':'MACD Momentum','ALL':'Todas','PAUSE_ALL':'Pausada'}};
+    const name = nameMap[x.strategy] || x.strategy;
+    return `<div class="strat-row">
+      <div><div class="strat-name">${{name}}</div><div style="font-size:9px;color:var(--muted)">${{total}} trades | Avg: $${{f(x.avg_pnl)}}</div></div>
+      <div style="display:flex;gap:20px;align-items:center">
+        <div class="strat-wr" style="color:${{wrColor}}">${{wr}}% WR</div>
+        <div class="strat-pnl" style="color:${{pnlColor}}">${{pnl>=0?'+':''}}$${{f(pnl)}}</div>
+      </div>
+    </div>`;
+  }}).join('');
+}})();
+
+// Improvement Requests
+(()=>{{
+  const el=document.getElementById('improvBox'), items=D.improvement_requests||[];
+  if(!items.length){{
+    el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>Sin solicitudes de mejora pendientes.<br><small>El bot analizará su estado y te notificará aquí.</small></p></div>';
+    return;
+  }}
+  const catIcon = {{'CONFIG':'⚙️','FEATURE':'🚀','STRATEGY_INSIGHT':'🧠','DATA_ISSUE':'📡'}};
+  el.innerHTML = items.map(x=>{{
+    const icon = catIcon[x.category]||'💡';
+    return `<div class="imp-item imp-${{x.priority}}">
+      <div class="imp-header">
+        <span class="imp-priority p${{x.priority}}">${{x.priority}}</span>
+        <span class="imp-cat">${{icon}} ${{x.category}}</span>
+        <span style="margin-left:auto;font-size:9px;color:var(--muted)">${{fd(x.timestamp).split(',')[0]}}</span>
+      </div>
+      <div class="imp-title">${{x.title}}</div>
+      <div class="imp-desc">${{x.description}}</div>
+    </div>`;
+  }}).join('');
+}})();
+
+// Monthly Metrics
+(()=>{{
+  const tbody=document.getElementById('monthlyTbody'), m=D.monthly_metrics||[];
+  if(!m.length){{
+    tbody.innerHTML='<tr><td colspan="7"><div class="empty" style="padding:20px">Datos disponibles al cierre del primer mes de operativa.</div></td></tr>';
+    return;
+  }}
+  tbody.innerHTML = m.map(x=>{{
+    const wr=parseFloat(x.win_rate)||0, pnl=parseFloat(x.total_pnl)||0;
+    const wrColor=wr>=50?'var(--green)':wr>=35?'var(--gold)':'var(--red)';
+    const pnlColor=pnl>=0?'var(--green)':'var(--red)';
+    return `<tr>
+      <td class="tm" style="color:var(--cyan)">${{x.month}}</td>
+      <td class="tm">${{x.total_trades||0}}</td>
+      <td class="tm" style="color:${{wrColor}}">${{wr.toFixed(1)}}%</td>
+      <td class="tm" style="color:${{pnlColor}}">${{pnl>=0?'+':''}}$${{f(pnl)}}</td>
+      <td class="tm" style="color:var(--red)">${{f(x.max_drawdown,1)}}%</td>
+      <td class="tm" style="color:var(--green)">${{x.best_pair||'—'}}</td>
+      <td class="tm" style="color:var(--red)">${{x.worst_pair||'—'}}</td>
+    </tr>`;
+  }}).join('');
 }})();
 </script>
 </body></html>"""

@@ -15,8 +15,9 @@ import logging
 import json
 import hashlib
 from datetime import datetime, timezone, timedelta
-from database import db, get_bot_config, set_bot_config
+from database import db, get_bot_config, set_bot_config, update_monthly_metrics
 from llm_brain import run_llm_brain_cycle
+from improvement_engine import run_improvement_engine
 
 logger = logging.getLogger(__name__)
 
@@ -591,6 +592,15 @@ def process_bot_brain():
         # 2. Ejecutar reflexión basada en LLM (intuitiva, estratégica)
         # Solo corre si hay API keys y ha pasado el cooldown
         run_llm_brain_cycle()
+
+        # 3. Actualizar métricas mensuales
+        try:
+            update_monthly_metrics()
+        except Exception as e:
+            logger.debug(f"update_monthly_metrics: {e}")
+
+        # 4. Analizar el estado del bot y generar solicitudes de mejora al usuario
+        run_improvement_engine()
 
     except Exception as e:
         logger.error(f"Error en el cerebro del bot: {e}", exc_info=True)

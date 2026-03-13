@@ -1,6 +1,6 @@
 import logging
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -46,5 +46,37 @@ def get_macro_context():
         logger.error(f"❌ Error en macro_analyzer: {e}")
         return None
 
-def is_high_impact_event_near():
-    return False
+def is_high_impact_event_near() -> bool:
+    """
+    Detecta si estamos cerca de un evento macro de alto impacto conocido.
+
+    Eventos cubiertos:
+    - NFP (Non-Farm Payrolls): primer viernes del mes, 13:00-14:30 UTC
+    - Apertura sesión americana (volatilidad elevada): viernes 12:30-13:00 UTC
+
+    Returns True si se debe pausar la apertura de nuevos trades.
+    """
+    try:
+        now = datetime.now(timezone.utc)
+        weekday = now.weekday()  # 0=Lunes, 4=Viernes
+
+        # NFP: Primer viernes del mes (día 1-7), ventana 12:30-14:30 UTC
+        if weekday == 4 and now.day <= 7:
+            if 12 <= now.hour < 15:
+                logger.warning(
+                    f"⚠️ Probable NFP: primer viernes del mes {now.strftime('%Y-%m-%d')}, "
+                    f"{now.hour:02d}:{now.minute:02d} UTC. Pausando nuevas entradas."
+                )
+                return True
+
+        # Apertura NY cualquier viernes (alta volatilidad pre-cierre semanal)
+        # Solo bloquear la primera media hora de apertura americana
+        if weekday == 4 and now.hour == 13 and now.minute < 30:
+            logger.info("⚠️ Apertura sesión americana (viernes). Cautela con nuevas entradas.")
+            return True
+
+        return False
+
+    except Exception as e:
+        logger.warning(f"is_high_impact_event_near error: {e}")
+        return False

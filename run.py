@@ -164,20 +164,20 @@ def run_cycle(dry_run: bool = False):
     # ── Abrir nuevos trades ───────────────────────────────────────
     if not dry_run and not event_near:
         from database import get_bot_config, get_daily_pnl
-        
+
         # APEX RULE 2: Daily Drawdown Limit (5%)
         daily_pnl = get_daily_pnl()
         max_daily_loss = broker.balance * 0.05
-        
+
         # Recuperar configuración dinámica
-        dyn_min_score = float(get_bot_config("MIN_SCORE_TO_TRADE", config.MIN_SCORE_TO_TRADE))
+        dyn_min_score    = float(get_bot_config("MIN_SCORE_TO_TRADE", config.MIN_SCORE_TO_TRADE))
         paused_pairs_str = get_bot_config("PAUSED_PAIRS", "")
-        paused_pairs = paused_pairs_str.split(",") if paused_pairs_str else []
+        paused_pairs     = [p for p in paused_pairs_str.split(",") if p] if paused_pairs_str else []
+        signal_only      = get_bot_config("SIGNAL_ONLY_MODE", "false") == "true"
 
         if daily_pnl < -max_daily_loss:
             msg = f"🚨 PAUSADO: Límite de drawdown diario alcanzado (${daily_pnl:,.2f})."
             logger.warning(msg)
-            # Aún ejecutamos el cerebro para que el MD explique por qué está pausado
             process_bot_brain()
             log_heartbeat("PAUSED", msg)
             return
@@ -190,33 +190,52 @@ def run_cycle(dry_run: bool = False):
             key=lambda x: x["score"], reverse=True
         )
 
-        for signal in tradeable:
-            if not broker.can_open_trade():
-                break
-            
-            # Recuperar el ID de la señal ya guardada o buscar la última para este par
-            last_sigs = get_latest_signals(10)
-            signal_id = next((s["id"] for s in last_sigs if s["pair"] == signal["pair"]), 0)
+        # ── Modo señal: alertas para trading manual (sin ejecución automática) ──
+        if signal_only:
+            logger.info("📊 MODO SEÑAL ACTIVO — enviando señales para operación manual")
+            if tradeable:
+                lines = ["📊 <b>SEÑALES PARA OPERACIÓN MANUAL</b>\n"]
+                for sig in tradeable[:3]:
+                    r     = sig.get("reasons", [])
+                    notes = " | ".join(x["note"] for x in r[:2]) if r else "Sin razones"
+                    sl    = sig.get("stop_loss")
+                    tp    = sig.get("take_profit")
+                    lines.append(
+                        f"🔔 <b>{sig['pair']}</b> {sig['direction']} | "
+                        f"Score: {sig['score']:.1f}/10\n"
+                        f"   💰 Precio: {sig['price']:.4g}\n"
+                        f"   🛑 SL: {sl:.4g if sl else '—'} | "
+                        f"🎯 TP: {tp:.4g if tp else '—'}\n"
+                        f"   📌 {notes}"
+                    )
+                send_telegram("\n\n".join(lines))
 
-            trade_id = broker.open_trade(
-                signal_id   = signal_id,
-                pair        = signal["pair"],
-                direction   = signal["direction"],
-                price       = signal["price"],
-                stop_loss   = signal.get("stop_loss"),
-                take_profit = signal.get("take_profit"),
-                atr         = signal.get("atr"), # Rule 6 Volatility
-            )
-            if trade_id:
-                r = signal.get("reasons", [])
-                notes = " | ".join(x["note"] for x in r[:2]) if r else ""
-                send_telegram(
-                    f"🔔 <b>Señal detectada</b>: {signal['pair']}\n"
-                    f"Dirección: <b>{signal['direction']}</b> | Score: {signal['score']:.1f}/10\n"
-                    f"Precio: {signal['price']:.4g}\n"
-                    f"📌 {notes}"
+        # ── Modo autónomo: ejecución automática de trades ─────────────────────
+        else:
+            for signal in tradeable:
+                if not broker.can_open_trade():
+                    break
+                last_sigs = get_latest_signals(10)
+                signal_id = next((s["id"] for s in last_sigs if s["pair"] == signal["pair"]), 0)
+                trade_id = broker.open_trade(
+                    signal_id   = signal_id,
+                    pair        = signal["pair"],
+                    direction   = signal["direction"],
+                    price       = signal["price"],
+                    stop_loss   = signal.get("stop_loss"),
+                    take_profit = signal.get("take_profit"),
+                    atr         = signal.get("atr"),
                 )
-        
+                if trade_id:
+                    r     = signal.get("reasons", [])
+                    notes = " | ".join(x["note"] for x in r[:2]) if r else ""
+                    send_telegram(
+                        f"🔔 <b>Señal detectada</b>: {signal['pair']}\n"
+                        f"Dirección: <b>{signal['direction']}</b> | Score: {signal['score']:.1f}/10\n"
+                        f"Precio: {signal['price']:.4g}\n"
+                        f"📌 {notes}"
+                    )
+
         # ── IA CONSCIOUSNESS: Reflexión post-operativa ───────────────
         process_bot_brain()
 
