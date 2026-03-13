@@ -497,6 +497,52 @@ def _generate_market_reflection(d, macro_regime: str):
     )
 
 
+def _defensive_decay(d):
+    """
+    Si el bot no ha operado en más de 24h, reduce gradualmente la selectividad
+    y normaliza el Stop Loss para evitar el bloqueo defensivo.
+    """
+    last_trade = d.query("SELECT open_time FROM paper_trades ORDER BY id DESC LIMIT 1")
+    if not last_trade:
+        return
+
+    try:
+        # Algunos open_time pueden venir sin el formato ISO completo
+        ot = last_trade[0]["open_time"]
+        if " " in ot and "T" not in ot: ot = ot.replace(" ", "T")
+        
+        last_dt = datetime.fromisoformat(ot)
+        if last_dt.tzinfo is None:
+            last_dt = last_dt.replace(tzinfo=timezone.utc)
+        
+        hours_inactive = (datetime.now(timezone.utc) - last_dt).total_seconds() / 3600
+        
+        if hours_inactive > 24 and not _was_thought_recently("DEFENSIVE_DECAY", hours=12):
+            current_min = _safe_float(get_bot_config("MIN_SCORE_TO_TRADE", 5.0))
+            current_atr = _safe_float(get_bot_config("STOP_LOSS_ATR", 1.2))
+            
+            changed = False
+            decay_msg = f"Inactividad de {hours_inactive:.1f}h detectada. "
+            
+            if current_min > 5.5:
+                new_min = max(current_min - 0.5, 5.5)
+                set_bot_config("MIN_SCORE_TO_TRADE", str(round(new_min, 1)))
+                decay_msg += f"Reduciendo score min: {current_min} -> {new_min}. "
+                changed = True
+            
+            if current_atr > 1.5:
+                new_atr = max(current_atr - 0.2, 1.5)
+                set_bot_config("STOP_LOSS_ATR", str(round(new_atr, 1)))
+                decay_msg += f"Normalizando SL ATR: {current_atr} -> {new_atr}. "
+                changed = True
+                
+            if changed:
+                _record_thought("DEFENSIVE_DECAY", decay_msg, "NEUTRAL")
+                _record_action(decay_msg)
+    except Exception as e:
+        logger.warning(f"⚠️ Error en defensive_decay: {e}")
+
+
 # ── Motor principal ──────────────────────────────────────────────────────────
 
 def run_brain_reflection():
@@ -528,7 +574,10 @@ def run_brain_reflection():
     # 7. Rendimiento por estrategia
     _analyze_strategy_performance(d)
 
-    # 8. Reflexión de mercado de alto nivel
+    # 8. Decaimiento defensivo (evita bloqueos por inactividad)
+    _defensive_decay(d)
+
+    # 9. Reflexión de mercado de alto nivel
     _generate_market_reflection(d, macro_regime)
 
 

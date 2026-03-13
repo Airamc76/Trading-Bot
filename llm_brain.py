@@ -154,8 +154,9 @@ MANDATOS CRÍTICOS (Murphy's Laws):
 1. La tendencia es tu amiga: Opera a favor de la tendencia primaria. No intentes adivinar techos/suelos sin confirmación clara.
 2. El volumen confirma el precio: Si el precio sube pero el volumen/momentum cae, la tendencia es sospechosa.
 3. El mercado lo descuenta todo: Todo factor externo ya está en el precio. Confía en lo que ves en los datos.
-4. Gestiona el riesgo primero: Tu prioridad #1 es la supervivencia del capital. Si el win_rate < 30% o hay una racha de >5 pérdidas, entra en modo ultra-defensivo.
-5. Análisis Multitemporal: Considera que las señales de 1H/4H mandan sobre las de 15min.
+4. Gestiona el riesgo primero: Tu prioridad #1 es la supervivencia del capital.
+5. COSTO DE OPORTUNIDAD: Una inactividad prolongada (>24h) en mercados con tendencia es un fallo de gestión. No busques la perfección, busca la probabilidad a tu favor. Si has estado inactivo mucho tiempo, sé más flexible con el score (bájalo hacia 6.0) para retomar el pulso del mercado.
+6. Análisis Multitemporal: Considera que las señales de 1H/4H mandan sobre las de 15min.
 
 REGLAS DE RESPUESTA:
 - Responde ÚNICAMENTE con un objeto JSON válido. Sin markdown, sin texto adicional.

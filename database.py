@@ -6,7 +6,7 @@ import os
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from contextlib import contextmanager
 
@@ -420,6 +420,30 @@ def get_dashboard_data() -> dict:
     macro   = get_latest_macro()
     memory  = d.query("SELECT * FROM bot_memory ORDER BY id DESC LIMIT 10")
     wishes  = d.query("SELECT * FROM bot_wishes WHERE status IN ('PENDING', 'ACTION') ORDER BY id DESC LIMIT 5")
+    heartbeats = get_recent_heartbeats()
+
+    # Health Metrics
+    now_utc = datetime.now(timezone.utc)
+    yesterday_iso = (now_utc - timedelta(days=1)).isoformat()
+    
+    # 1. Error count (Last 24h)
+    err_24h = d.query("SELECT COUNT(*) as c FROM system_logs WHERE level IN ('ERROR', 'CRITICAL') AND timestamp > ?", [yesterday_iso])[0]["c"] or 0
+    
+    # 2. Autonomous Actions count (Last 24h)
+    act_24h = d.query("SELECT COUNT(*) as c FROM bot_wishes WHERE status = 'ACTION' AND timestamp > ?", [yesterday_iso])[0]["c"] or 0
+    
+    # 3. Downtime Detection (Last heartbeat)
+    last_hb = heartbeats[0]["timestamp"] if heartbeats else None
+    is_down = False
+    if last_hb:
+        try:
+            # Handle potential space in timestamp
+            if " " in last_hb and "T" not in last_hb: last_hb = last_hb.replace(" ", "T")
+            hb_dt = datetime.fromisoformat(last_hb)
+            if hb_dt.tzinfo is None: hb_dt = hb_dt.replace(tzinfo=timezone.utc)
+            if (now_utc - hb_dt).total_seconds() > 1800: # 30 min
+                is_down = True
+        except: pass
 
     balance_val = float(bal_r[0]["balance"]) if bal_r else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
@@ -436,10 +460,16 @@ def get_dashboard_data() -> dict:
         "trades":          trades,
         "balance_history": list(reversed(bal_hist)),
         "macro":           macro,
-        "heartbeats":      get_recent_heartbeats(),
+        "heartbeats":      heartbeats,
         "system_logs":     get_recent_logs(),
         "bot_memory":      memory,
         "bot_wishes":      wishes,
+        "health": {
+            "status": "DOWN" if is_down else ("WARNING" if err_24h > 0 else "OK"),
+            "errors_24h": int(err_24h),
+            "actions_24h": int(act_24h),
+            "last_heartbeat": last_hb
+        },
         "bot_config": {
             "strategy":      get_bot_config("ACTIVE_STRATEGY", "ALL"),
             "min_score":     get_bot_config("MIN_SCORE_TO_TRADE", "5.0"),
@@ -447,7 +477,7 @@ def get_dashboard_data() -> dict:
             "paused":        get_bot_config("TRADING_PAUSED", "false") == "true",
             "paused_pairs":  get_bot_config("PAUSED_PAIRS", "")
         },
-        "last_updated":    datetime.now(timezone.utc).isoformat(),
+        "last_updated":    now_utc.isoformat(),
     }
 
 

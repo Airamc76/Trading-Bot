@@ -18,7 +18,7 @@ def generate():
     data      = get_dashboard_data()
     print(f"DEBUG: Trade count in data={len(data.get('trades', []))}")
     data_json = json.dumps(data, default=str, ensure_ascii=False)
-    html      = build_html(data_json)
+    html      = build_html(data_json, data)
 
     Path("site").mkdir(exist_ok=True)
     Path("site/index.html").write_text(html, encoding="utf-8")
@@ -29,7 +29,18 @@ def generate():
           f"Trades: {data['total_trades']}")
 
 
-def build_html(data_json: str) -> str:
+def build_html(data_json: str, data: dict) -> str:
+    # --- NUEVO: PANEL DE SALUD ---
+    health = data.get("health", {})
+    status = health.get("status", "OK")
+    h_class = "status-ok" if status == "OK" else ("status-warning" if status == "WARNING" else "status-down")
+    h_icon = "✅" if status == "OK" else ("⚠️" if status == "WARNING" else "🛑")
+    h_text = "SISTEMA SALUDABLE" if status == "OK" else ("ADVERTENCIA" if status == "WARNING" else "BOT DESCONECTADO")
+    
+    last_hb = health.get("last_heartbeat", "---")
+    if last_hb and "T" in last_hb:
+        last_hb = last_hb.split("T")[1][:5] # HH:MM
+
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -77,6 +88,33 @@ body::after{{
 .live{{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--green);margin-top:4px}}
 .live::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}}
 @keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 6px var(--green)}}50%{{opacity:.2;box-shadow:none}}}}
+
+/* System Health Panel */
+.status-panel {{
+    border-left: 6px solid #4ade80;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    background: rgba(255,255,255,0.05);
+    margin-bottom: 25px;
+    padding: 20px;
+    border-radius: 4px;
+}}
+.status-ok {{ border-left-color: #4ade80; }}
+.status-warning {{ border-left-color: #fbbf24; background: rgba(251, 191, 36, 0.05); }}
+.status-down {{ border-left-color: #ef4444; background: rgba(239, 68, 68, 0.05); animation: pulse-red 2s infinite; }}
+
+.status-header {{ display: flex; align-items: center; gap: 10px; font-weight: bold; font-size: 1.1em; }}
+.status-grid {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; }}
+.status-item {{ display: flex; flex-direction: column; }}
+.status-label {{ font-size: 0.85em; opacity: 0.7; color: var(--muted); }}
+.status-value {{ font-family: var(--mono); font-weight: 600; font-size: 1.05em; color: var(--text); }}
+
+@keyframes pulse-red {{
+    0% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }}
+    70% {{ box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }}
+    100% {{ box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }}
+}}
 
 /* KPIs */
 .kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}}
@@ -211,6 +249,7 @@ footer span{{color:var(--cyan)}}
 .l-WARNING{{color:var(--gold)}}
 .l-ERROR{{color:var(--red)}}
 .log-msg{{color:rgba(255,255,255,0.9);word-break:break-word}}
+
 /* MD PANEL */
 .md-exec {{ background: linear-gradient(135deg, #0a1120, #0c1a30); border: 1px solid var(--cyan); border-radius: 10px; padding: 18px; position:relative; }}
 .md-role {{ font-family: var(--mono); color: var(--gold); font-size: 11px; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; }}
@@ -239,6 +278,27 @@ footer span{{color:var(--cyan)}}
     <div class="live">ACTIVO 24/7</div>
   </div>
 </header>
+
+<div class="card status-panel {h_class}">
+    <div class="status-header">
+        <span class="status-icon">{h_icon}</span>
+        <span class="status-text">{h_text}</span>
+    </div>
+    <div class="status-grid">
+        <div class="status-item">
+            <span class="status-label">Heartbeat:</span>
+            <span class="status-value">{last_hb}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Fallos (24h):</span>
+            <span class="status-value">{health.get('errors_24h', 0)}</span>
+        </div>
+        <div class="status-item">
+            <span class="status-label">Acciones IA (24h):</span>
+            <span class="status-value">{health.get('actions_24h', 0)}</span>
+        </div>
+    </div>
+</div>
 
 <div class="kpis" id="kpis"></div>
 
