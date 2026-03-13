@@ -268,6 +268,35 @@ def db():
 
 def initialize_database():
     db().initialize()
+    migrate_database()
+
+
+def migrate_database():
+    """Añade columnas o tablas faltantes sin romper los datos existentes."""
+    d = db()
+    logger.info("🛠️ Ejecutando migraciones de base de datos...")
+    
+    # 1. Asegurar columna 'sentiment' en 'signals'
+    try:
+        # PRAGMA table_info es soportado por SQLite y libSQL
+        cols = d.query("PRAGMA table_info(signals)")
+        has_sentiment = any(c['name'] == 'sentiment' for c in cols)
+        if not has_sentiment:
+            logger.info("➕ Añadiendo columna 'sentiment' a tabla 'signals'...")
+            d.execute("ALTER TABLE signals ADD COLUMN sentiment REAL DEFAULT 0")
+            d.commit()
+    except Exception as e:
+        logger.warning(f"Error migrando signals: {e}")
+
+    # 2. Asegurar que todas las tablas del SCHEMA existan
+    # initialize() ya lo hace con CREATE TABLE IF NOT EXISTS, 
+    # pero llamamos a initialize de nuevo por si acaso falló algo antes.
+    try:
+        d.initialize()
+    except Exception as e:
+        logger.warning(f"Error re-inicializando tablas: {e}")
+
+    logger.info("✅ Migraciones completadas")
 
 
 def save_prices(records: list):
