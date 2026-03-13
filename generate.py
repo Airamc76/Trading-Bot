@@ -705,4 +705,10 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 
 
 if __name__ == "__main__":
-    generate()
+    try:
+        generate()
+    except Exception as e:
+        import traceback
+        print("\n❌ CRITICAL: Dashboard generation failed!")
+        traceback.print_exc()
+        sys.exit(1)

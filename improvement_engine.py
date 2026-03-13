@@ -155,8 +155,12 @@ def _analyze_balance_health(d):
         )
 
     # Sugerir modo señal cuando el rendimiento es sólido
-    total = int(d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status != 'OPEN'")[0]["c"] or 0)
-    wins  = int(d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'WIN'")[0]["c"] or 0)
+    total_row = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status != 'OPEN'")
+    total = int(total_row[0].get("c") or 0) if total_row else 0
+    
+    wins_row = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'WIN'")
+    wins = int(wins_row[0].get("c") or 0) if wins_row else 0
+    
     if total >= 30 and wins > 0:
         wr = wins / total * 100
         if wr >= 48 and drawdown < 3 and not _was_requested_recently("Modo Señal"):
@@ -176,7 +180,7 @@ def _check_data_freshness(d):
     recent = d.query(
         "SELECT COUNT(*) as c FROM signals WHERE timestamp > datetime('now', '-3 hours')"
     )
-    if recent and int(recent[0]["c"]) == 0:
+    if recent and int(recent[0].get("c") or 0) == 0:
         if not _was_requested_recently("Sin señales recientes"):
             _save_request(
                 "DATA_ISSUE", "HIGH",
@@ -192,7 +196,8 @@ def _check_data_freshness(d):
 def _suggest_multi_timeframe():
     """Sugiere mejoras de análisis multitemporal si hay suficientes datos."""
     d = db()
-    total = int(d.query("SELECT COUNT(*) as c FROM paper_trades")[0]["c"] or 0)
+    total_row = d.query("SELECT COUNT(*) as c FROM paper_trades")
+    total = int(total_row[0].get("c") or 0) if total_row else 0
     if total >= 20 and not _was_requested_recently("análisis multitemporal", hours=168):
         _save_request(
             "FEATURE", "LOW",

@@ -402,7 +402,11 @@ def get_open_trades() -> list:
 
 def get_portfolio_balance() -> float:
     rows = db().query("SELECT balance FROM portfolio ORDER BY id DESC LIMIT 1")
-    return float(rows[0]["balance"]) if rows else None
+    if not rows: return 10000.0
+    try:
+        return float(rows[0]["balance"])
+    except (KeyError, TypeError, ValueError):
+        return 10000.0
 
 
 def update_portfolio(balance: float, equity: float, note: str = ""):
@@ -416,11 +420,20 @@ def update_portfolio(balance: float, equity: float, note: str = ""):
 
 def get_dashboard_data() -> dict:
     d = db()
-    total  = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status != 'OPEN'")[0]["c"] or 0
-    wins   = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'WIN'")[0]["c"] or 0
-    losses = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'LOSS'")[0]["c"] or 0
-    open_t = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'OPEN'")[0]["c"] or 0
-    pnl_r  = d.query("SELECT COALESCE(SUM(pnl),0) as s FROM paper_trades WHERE status != 'OPEN'")[0]["s"] or 0
+    
+    def safe_count(sql, params=None):
+        r = d.query(sql, params or [])
+        if not r: return 0
+        return int(r[0].get("c") or 0)
+
+    total  = safe_count("SELECT COUNT(*) as c FROM paper_trades WHERE status != 'OPEN'")
+    wins   = safe_count("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'WIN'")
+    losses = safe_count("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'LOSS'")
+    open_t = safe_count("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'OPEN'")
+    
+    pnl_rows = d.query("SELECT COALESCE(SUM(pnl),0) as s FROM paper_trades WHERE status != 'OPEN'")
+    pnl_r = float(pnl_rows[0].get("s") or 0) if pnl_rows else 0.0
+    
     bal_r  = d.query("SELECT balance FROM portfolio ORDER BY id DESC LIMIT 1")
     signals = d.query("SELECT pair,direction,score,price,timestamp,sentiment FROM signals ORDER BY id DESC LIMIT 20")
     # Join paper_trades with trade_feedback
@@ -436,10 +449,10 @@ def get_dashboard_data() -> dict:
     yesterday_iso = (now_utc - timedelta(days=1)).isoformat()
     
     # 1. Error count (Last 24h)
-    err_24h = d.query("SELECT COUNT(*) as c FROM system_logs WHERE level IN ('ERROR', 'CRITICAL') AND timestamp > ?", [yesterday_iso])[0]["c"] or 0
+    err_24h = safe_count("SELECT COUNT(*) as c FROM system_logs WHERE level IN ('ERROR', 'CRITICAL') AND timestamp > ?", [yesterday_iso])
     
     # 2. Autonomous Actions count (Last 24h)
-    act_24h = d.query("SELECT COUNT(*) as c FROM bot_wishes WHERE status = 'ACTION' AND timestamp > ?", [yesterday_iso])[0]["c"] or 0
+    act_24h = safe_count("SELECT COUNT(*) as c FROM bot_wishes WHERE status = 'ACTION' AND timestamp > ?", [yesterday_iso])
     
     # 3. Downtime Detection (Last heartbeat)
     last_hb = heartbeats[0]["timestamp"] if heartbeats else None
@@ -454,7 +467,7 @@ def get_dashboard_data() -> dict:
                 is_down = True
         except: pass
 
-    balance_val = float(bal_r[0]["balance"]) if bal_r else 10000.0
+    balance_val = float(bal_r[0].get("balance") or 10000.0) if (bal_r and "balance" in bal_r[0]) else 10000.0
     total, wins, losses, open_t = int(total), int(wins), int(losses), int(open_t)
 
     # Nuevos datos para paneles avanzados
@@ -615,7 +628,8 @@ def df_to_records(df):
 def get_bot_config(key: str, default=None):
     """Obtener configuración dinámica de la base de datos."""
     rows = db().query("SELECT value FROM bot_config WHERE key = ?", [key])
-    return rows[0]["value"] if rows else default
+    if not rows: return default
+    return rows[0].get("value", default)
 
 
 def set_bot_config(key: str, value: str):
