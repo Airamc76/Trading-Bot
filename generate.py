@@ -489,8 +489,8 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 (()=>{{
   const el=document.getElementById('mdSummary'), m=D.bot_memory||[], c=D.bot_config||{{}};
   const lastLLM = m.find(x => x.category === 'LLM_REASONING');
-  const thought = lastLLM ? lastLLM.note.replace(/^\[.*?\]\s*/, '') : 'El Managing Director está analizando los datos actuales del mercado...';
-  const model = lastLLM ? (lastLLM.note.match(/^\[(.*?)\]/) || [null, 'IA'])[1] : 'MD';
+  const thought = lastLLM ? lastLLM.note.replace(/^\\\[.*?\\\]\\s*/, '') : 'El Managing Director está analizando los datos actuales del mercado...';
+  const model = lastLLM ? (lastLLM.note.match(/^\\\[(.*?)\\\]/) || [null, 'IA'])[1] : 'MD';
 
   el.innerHTML = `
     <div class="md-status">
