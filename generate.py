@@ -249,10 +249,13 @@ footer span{{color:var(--cyan)}}
 
 /* PULSE */
 .pulse-item{{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:10px;border-bottom:1px solid var(--border)}}
-.pulse-item:last-child{{border-bottom:none}}
-.pdot{{width:6px;height:6px;border-radius:50%;margin-right:8px;display:inline-block}}
-.pSUCCESS{{background:var(--green);box-shadow:0 0 5px var(--green)}}
-.pRUNNING{{background:var(--gold);box-shadow:0 0 5px var(--gold);animation: blink 1s infinite}}
+/* MARKET MONITOR */
+.mmon-item {{ display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--s1); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }}
+.mmon-pair {{ font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--cyan); }}
+.mmon-price {{ font-family: var(--mono); font-size: 12px; color: #eee; }}
+.mmon-score {{ font-family: var(--mono); font-size: 12px; font-weight: 700; }}
+.mmon-sent {{ font-size: 10px; margin-left: 6px; }}
+
 @keyframes blink {{ 0%{{opacity:1}} 50%{{opacity:0.3}} 100%{{opacity:1}} }}
 
 /* LOGS */
@@ -422,8 +425,24 @@ footer span{{color:var(--cyan)}}
     <div class="pb"><div id="lessonFeed"></div></div>
   </div>
   <div class="panel">
-    <div class="ph"><span>⚡</span><span class="phtitle">Pulso del Sistema</span><span class="phsub">Heartbeat</span></div>
-    <div class="pb" id="pulseBox"></div>
+    <div class="ph"><span>🔎</span><span class="phtitle">Monitor de Mercado</span><span class="phsub">Puntajes en vivo</span></div>
+    <div class="pb" id="marketMonitor"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
+    <div class="pb" id="macroBox"></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🧠</span><span class="phtitle">Memoria de Corto Plazo</span><span class="phsub">IA Reasoning Log</span></div>
+    <div class="pb"><div id="brainFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>💡</span><span class="phtitle">Peticiones de la IA</span><span class="phsub">Autonomous Requests</span></div>
+    <div class="pb"><div id="wishFeed"></div></div>
+  </div>
+  <div class="panel">
+    <div class="ph"><span>🎯</span><span class="phtitle">Análisis de Feedback</span><span class="phsub">Post-Mortem Engine</span></div>
+    <div class="pb"><div id="lessonFeed"></div></div>
   </div>
   <div class="panel">
     <div class="ph"><span>🔬</span><span class="phtitle">Rendimiento por Estrategia</span><span class="phsub">Últimos 30 días</span></div>
@@ -528,6 +547,25 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
   `).join('');
 }})();
 
+// Market Monitor
+(()=>{{
+  const el=document.getElementById('marketMonitor'), m=D.market_monitor||[];
+  if(!m.length){{el.innerHTML='<div class="empty">Sincronizando mercado...</div>';return;}}
+  el.innerHTML = m.map(x => {{
+    const sColor = x.score >= 5 ? 'var(--green)' : x.score >= 3 ? 'var(--gold)' : 'var(--muted)';
+    const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
+    return `
+      <div class="mmon-item">
+        <div>
+          <div class="mmon-pair">${{x.pair}} <span class="mmon-sent" title="Sentimiento: ${{Number(x.sentiment).toFixed(2)}}">${{sentIcon}}</span></div>
+          <div class="mmon-price">$${{f(x.price, x.pair.includes('=X')?4:2)}}</div>
+        </div>
+        <div class="mmon-score" style="color:${{sColor}}">${{f(x.score,1)}}/10</div>
+      </div>
+    `;
+  }}).join('');
+}})();
+
 // Macro
 (()=>{{
   const el=document.getElementById('macroBox'), m=D.macro;
@@ -549,20 +587,6 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
       Sincronizado: ${{fd(m.timestamp)}}
     </div>
   `;
-}})();
-
-// Pulse
-(()=>{{
-  const el=document.getElementById('pulseBox'), hb=D.heartbeats||[];
-  if(!hb.length){{el.innerHTML='<div class="empty">Esperando pulso...</div>';return;}}
-  
-  el.innerHTML = hb.map(h => `
-    <div class="pulse-item">
-      <div><span class="pdot p${{h.status}}"></span><span style="font-weight:600">${{h.status}}</span></div>
-      <div style="color:var(--muted);font-size:9px">${{h.note}}</div>
-      <div style="font-family:var(--mono);opacity:0.8">${{fd(h.timestamp).split(',')[1]}}</div>
-    </div>
-  `).join('');
 }})();
 
 // Bot Brain History

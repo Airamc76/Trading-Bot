@@ -496,6 +496,7 @@ def get_dashboard_data() -> dict:
         "strategy_performance": strategy_perf,
         "monthly_metrics":      monthly_metrics_data,
         "signal_only_mode":     signal_only_mode,
+        "market_monitor":       get_market_monitor(),
         "health": {
             "status": "DOWN" if is_down else ("WARNING" if err_24h > 0 else "OK"),
             "errors_24h": int(err_24h),
@@ -538,6 +539,33 @@ def get_strategy_performance() -> list:
         GROUP BY strategy
         ORDER BY total_pnl DESC
     """)
+
+
+def get_market_monitor() -> list:
+    """Obtiene el último estado (precio, score, sentimiento) de cada par."""
+    pairs = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "EURUSD=X", "GBPUSD=X", "USDJPY=X"]
+    results = []
+    
+    for p in pairs:
+        # Buscar última señal para este par
+        rows = db().query(
+            "SELECT price, score, sentiment, timestamp FROM signals WHERE pair = ? ORDER BY id DESC LIMIT 1",
+            [p]
+        )
+        if rows:
+            r = rows[0]
+            results.append({
+                "pair": p,
+                "price": r.get("price") or 0.0,
+                "score": r.get("score") or 0.0,
+                "sentiment": r.get("sentiment") or 0.0,
+                "timestamp": r.get("timestamp")
+            })
+        else:
+            results.append({
+                "pair": p, "price": 0.0, "score": 0.0, "sentiment": 0.0, "timestamp": None
+            })
+    return results
 
 
 def get_monthly_metrics() -> list:
