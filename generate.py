@@ -4,6 +4,7 @@ GitHub Pages publica este archivo automáticamente.
 """
 import sys
 import json
+import re
 from pathlib import Path
 from datetime import datetime, timezone
 
@@ -30,7 +31,7 @@ def generate():
 
 
 def build_html(data_json: str, data: dict) -> str:
-    # --- NUEVO: PANEL DE SALUD ---
+    # --- PROCESAMIENTO EN PYTHON (Evita backslashes en el f-string) ---
     health = data.get("health", {})
     status = health.get("status", "OK")
     h_class = "status-ok" if status == "OK" else ("status-warning" if status == "WARNING" else "status-down")
@@ -40,6 +41,34 @@ def build_html(data_json: str, data: dict) -> str:
     last_hb = health.get("last_heartbeat", "---")
     if last_hb and "T" in last_hb:
         last_hb = last_hb.split("T")[1][:5] # HH:MM
+
+    # Datos de salud
+    err_24h = health.get("errors_24h", 0)
+    act_24h = health.get("actions_24h", 0)
+
+    # Lógica del MD (Extraída de JS a Python para evitar SyntaxWarnings)
+    memory = data.get("bot_memory", [])
+    last_llm = next((x for x in memory if x.get("category") == "LLM_REASONING"), None)
+    
+    md_thought = "El Managing Director está analizando los datos actuales del mercado..."
+    md_model = "MD"
+    md_time = ""
+
+    if last_llm:
+        note = last_llm.get("note", "")
+        # Extraer [Modelo] y limpiar nota
+        md_thought = re.sub(r'^\[.*?\]\s*', '', note)
+        m = re.match(r'^\[(.*?)\]', note)
+        md_model = m.group(1) if m else "IA"
+        
+        # Formatear hora
+        ts = last_llm.get("timestamp")
+        if ts and "T" in ts:
+            md_time = ts.split("T")[1][:5]
+
+    config = data.get("bot_config", {})
+    is_paused = config.get("paused", False)
+    paused_pairs_count = len(config.get("paused_pairs", "").split(",")) if config.get("paused_pairs") else 0
 
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -291,11 +320,11 @@ footer span{{color:var(--cyan)}}
         </div>
         <div class="status-item">
             <span class="status-label">Fallos (24h):</span>
-            <span class="status-value">{health.get('errors_24h', 0)}</span>
+            <span class="status-value">{err_24h}</span>
         </div>
         <div class="status-item">
             <span class="status-label">Acciones IA (24h):</span>
-            <span class="status-value">{health.get('actions_24h', 0)}</span>
+            <span class="status-value">{act_24h}</span>
         </div>
     </div>
 </div>
@@ -309,7 +338,20 @@ footer span{{color:var(--cyan)}}
   </div>
   <div class="md-exec">
     <div class="md-role">👤 MANAGING DIRECTOR (MD)</div>
-    <div id="mdSummary"></div>
+    <div id="mdSummary">
+        <div class="md-status">
+          <span class="md-state {'bLOSS' if is_paused else 'bWIN'}">{ 'PAUSADO' if is_paused else 'OPERATIVO' }</span>
+          <span class="md-state dNEUTRAL" style="color:var(--gold)">{ md_model }</span>
+          <span class="hts" style="margin-left:auto">{ md_time }</span>
+        </div>
+        <div class="md-thought">"{ md_thought }"</div>
+        <div class="md-metrics">
+          <div class="md-m"><div class="md-mlv">ESTRATEGIA</div><div class="md-mva">{ config.get('strategy', '---') }</div></div>
+          <div class="md-m"><div class="md-mlv">SCORE MÍN</div><div class="md-mva">{ config.get('min_score', '5.0') }/10</div></div>
+          <div class="md-m"><div class="md-mlv">STOP LOSS</div><div class="md-mva">{ config.get('sl_atr', '1.2') }x ATR</div></div>
+          <div class="md-m"><div class="md-mlv">PARES PAUS.</div><div class="md-mva">{ paused_pairs_count }</div></div>
+        </div>
+    </div>
   </div>
 </div>
 
@@ -483,29 +525,6 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
       <div style="font-family:var(--mono);opacity:0.8">${{fd(h.timestamp).split(',')[1]}}</div>
     </div>
   `).join('');
-}})();
-
-// Bot Brain MD Summary
-(()=>{{
-  const el=document.getElementById('mdSummary'), m=D.bot_memory||[], c=D.bot_config||{{}};
-  const lastLLM = m.find(x => x.category === 'LLM_REASONING');
-  const thought = lastLLM ? lastLLM.note.replace(/^\\\[.*?\\\]\\s*/, '') : 'El Managing Director está analizando los datos actuales del mercado...';
-  const model = lastLLM ? (lastLLM.note.match(/^\\\[(.*?)\\\]/) || [null, 'IA'])[1] : 'MD';
-
-  el.innerHTML = `
-    <div class="md-status">
-      <span class="md-state b${{c.paused?'LOSS':'WIN'}}">${{c.paused?'PAUSADO':'OPERATIVO'}}</span>
-      <span class="md-state dNEUTRAL" style="color:var(--gold)">${{model}}</span>
-      <span class="hts" style="margin-left:auto">${{lastLLM ? fd(lastLLM.timestamp).split(',')[1] : ''}}</span>
-    </div>
-    <div class="md-thought">"${{thought}}"</div>
-    <div class="md-metrics">
-      <div class="md-m"><div class="md-mlv">ESTRATEGIA</div><div class="md-mva">${{c.strategy}}</div></div>
-      <div class="md-m"><div class="md-mlv">SCORE MÍN</div><div class="md-mva">${{f(c.min_score,1)}}/10</div></div>
-      <div class="md-m"><div class="md-mlv">STOP LOSS</div><div class="md-mva">${{f(c.sl_atr,2)}}x ATR</div></div>
-      <div class="md-m"><div class="md-mlv">PARES PAUS.</div><div class="md-mva">${{c.paused_pairs ? c.paused_pairs.split(',').length : 0}}</div></div>
-    </div>
-  `;
 }})();
 
 // Bot Brain History
