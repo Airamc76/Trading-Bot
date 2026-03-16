@@ -8,7 +8,6 @@ import re
 from pathlib import Path
 from datetime import datetime, timezone
 
-# Sin subcarpetas — todo en la raíz
 from database import initialize_database, get_dashboard_data
 
 
@@ -31,21 +30,18 @@ def generate():
 
 
 def build_html(data_json: str, data: dict) -> str:
-    # --- PROCESAMIENTO EN PYTHON (Evita backslashes en el f-string) ---
     health = data.get("health", {})
     status = health.get("status", "OK")
-    h_class = status # OK, WARNING, DOWN
+    h_class = status
     h_text = "SISTEMA SALUDABLE" if status == "OK" else ("AVISO DE RED" if status == "WARNING" else "BOT DESCONECTADO")
     
     last_hb = health.get("last_heartbeat", "---")
     if last_hb and "T" in last_hb:
-        last_hb = last_hb.split("T")[1][:5] # HH:MM
+        last_hb = last_hb.split("T")[1][:5]
 
-    # Datos de salud
     err_24h = health.get("errors_24h", 0)
     act_24h = health.get("actions_24h", 0)
 
-    # Lógica del MD (Extraída de JS a Python para evitar SyntaxWarnings)
     memory = data.get("bot_memory", [])
     last_llm = next((x for x in memory if x.get("category") == "LLM_REASONING"), None)
     
@@ -55,12 +51,11 @@ def build_html(data_json: str, data: dict) -> str:
 
     if last_llm:
         note = last_llm.get("note", "")
-        # Extraer [Modelo] y limpiar nota
+        import re
         md_thought = re.sub(r'^\[.*?\]\s*', '', note)
         m = re.match(r'^\[(.*?)\]', note)
         md_model = m.group(1) if m else "IA"
         
-        # Formatear hora
         ts = last_llm.get("timestamp")
         if ts and "T" in ts:
             md_time = ts.split("T")[1][:5]
@@ -70,615 +65,404 @@ def build_html(data_json: str, data: dict) -> str:
     is_signal_only  = config.get("signal_only", False)
     paused_pairs_count = len(config.get("paused_pairs", "").split(",")) if config.get("paused_pairs") else 0
 
-    # Banner modo señal
-    signal_only_html = ""
-    if is_signal_only:
-        signal_only_html = """
-<div class="signal-only-banner">
-  <div class="sob-icon">📊</div>
-  <div>
-    <div class="sob-text">MODO SEÑAL ACTIVO — Trading Manual</div>
-    <div class="sob-sub">El bot NO ejecuta trades automáticamente. Las señales se envían por Telegram para que las operes tú manualmente.</div>
-  </div>
-</div>"""
-
     return f"""<!DOCTYPE html>
-<html lang="es">
+<html lang="es" class="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="refresh" content="60">
-<title>Trading Bot — Dashboard</title>
+<title>Apex Trading — AI Director</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {{
+    darkMode: 'class',
+    theme: {{
+      extend: {{
+        fontFamily: {{ sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] }},
+        colors: {{
+          dark: '#050b14', panel: 'rgba(13, 22, 38, 0.65)', border_light: 'rgba(255,255,255,0.08)',
+          accent: '#00e5ff', pos: '#00ff88', neg: '#ff3b5c', warn: '#ffd000'
+        }}
+      }}
+    }}
+  }}
+</script>
 <style>
-:root{{
-  --bg:#04080f;--s1:#080f1a;--s2:#0c1422;--border:#16243a;
-  --cyan:#00e5ff;--gold:#ffd000;--green:#00ff88;--red:#ff3b5c;
-  --text:#c8d8e8;--muted:#3d5a7a;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;
-}}
-*{{box-sizing:border-box;margin:0;padding:0}}
-body{{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh}}
-body::after{{
-  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
-  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.06) 2px,rgba(0,0,0,.06) 4px);
-}}
-.page{{max-width:1320px;margin:0 auto;padding:20px 24px}}
+  body {{ background: #050b14; color: #cbd5e1; min-height: 100vh; position: relative; }}
+  body::before {{ content: ''; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+    background: radial-gradient(circle at 50% 0%, rgba(0, 229, 255, 0.08) 0vw, transparent 50vw),
+                radial-gradient(circle at 100% 100%, rgba(0, 255, 136, 0.05) 0vw, transparent 40vw); }}
+  .glass-panel {{ background: var(--panel); backdrop-filter: blur(16px); border: 1px solid var(--border_light); border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.3); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; }}
+  .glass-panel:hover {{ box-shadow: 0 12px 40px rgba(0,229,255,0.08); border-color: rgba(0,229,255,0.2); }}
+  .panel-header {{ padding: 14px 20px; border-bottom: 1px solid var(--border_light); background: rgba(0,0,0,0.2); display: flex; align-items: center; gap: 10px; }}
+  .panel-title {{ font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: #f8fafc; }}
+  .panel-body {{ padding: 20px; }}
+  
+  .badge {{ padding: 3px 8px; border-radius: 6px; font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 700; border: 1px solid transparent; }}
+  .bWIN, .bBUY, .mUP {{ background: rgba(0,255,136,0.1); color: var(--pos); border-color: rgba(0,255,136,0.2); }}
+  .bLOSS, .bSELL, .mDOWN {{ background: rgba(255,59,92,0.1); color: var(--neg); border-color: rgba(255,59,92,0.2); }}
+  .bOPEN {{ background: rgba(0,229,255,0.1); color: var(--accent); border-color: rgba(0,229,255,0.2); }}
+  
+  .custom-scroll::-webkit-scrollbar {{ width: 6px; }}
+  .custom-scroll::-webkit-scrollbar-track {{ background: transparent; }}
+  .custom-scroll::-webkit-scrollbar-thumb {{ background: rgba(255,255,255,0.1); border-radius: 10px; }}
+  .custom-scroll::-webkit-scrollbar-thumb:hover {{ background: rgba(0,229,255,0.5); }}
 
-/* HEADER */
-.header{{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 24px;margin-bottom:24px;
-  background:var(--s1);border:1px solid var(--border);
-  border-top:2px solid var(--cyan);border-radius:0 0 12px 12px;
-}}
-.hlogo{{display:flex;align-items:center;gap:16px}}
-.hmark{{
-  width:48px;height:48px;font-size:26px;
-  background:linear-gradient(135deg,#001a2e,#003a5c);
-  border:1px solid var(--cyan);border-radius:10px;
-  display:flex;align-items:center;justify-content:center;
-}}
-.htitle{{font-family:var(--mono);font-size:16px;font-weight:700;color:var(--cyan);letter-spacing:2px}}
-.hsub{{font-size:12px;color:var(--muted);margin-top:3px}}
-.hright{{text-align:right}}
-.hts{{font-family:var(--mono);font-size:11px;color:var(--muted)}}
-.hts span{{color:var(--gold)}}
-.live{{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:11px;color:var(--green);margin-top:4px}}
-.live::before{{content:'';width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.4s infinite}}
-@keyframes blink{{0%,100%{{opacity:1;box-shadow:0 0 6px var(--green)}}50%{{opacity:.2;box-shadow:none}}}}
-
-/* KPIs */
-.kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:20px}}
-@media(max-width:900px){{.kpis{{grid-template-columns:repeat(2,1fr)}}}}
-.kpi{{background:var(--s2);border:1px solid var(--border);border-radius:10px;padding:20px 22px;position:relative;overflow:hidden;transition:border-color .2s,transform .15s;cursor:default}}
-.kpi:hover{{border-color:var(--cyan);transform:translateY(-1px)}}
-.ka{{position:absolute;top:0;left:0;width:3px;height:100%;border-radius:10px 0 0 10px}}
-.ka.c{{background:var(--cyan)}}.ka.g{{background:var(--green)}}.ka.r{{background:var(--red)}}.ka.y{{background:var(--gold)}}
-.klabel{{font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}}
-.kval{{font-family:var(--mono);font-size:30px;font-weight:700;line-height:1}}
-.kval.c{{color:var(--cyan)}}.kval.g{{color:var(--green)}}.kval.r{{color:var(--red)}}.kval.y{{color:var(--gold)}}
-.ksub{{font-size:11px;color:var(--muted);margin-top:8px}}
-
-/* GRID */
-.g2{{display:grid;grid-template-columns:1fr 340px;gap:16px;margin-bottom:16px}}
-.g2b{{display:grid;grid-template-columns:1fr 1fr;gap:16px}}
-@media(max-width:1100px){{.g2{{grid-template-columns:1fr}}}}
-@media(max-width:800px){{.g2b{{grid-template-columns:1fr}}}}
-
-/* PANEL */
-.panel{{background:var(--s2);border:1px solid var(--border);border-radius:10px;overflow:hidden}}
-.ph{{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;background:var(--s1)}}
-.phtitle{{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:1.5px}}
-.phsub{{font-size:11px;color:var(--muted);margin-left:auto}}
-.pb{{padding:18px 20px}}
-
-/* CHART */
-.cbox{{height:200px;position:relative}}
-
-/* TABLE */
-.tw{{overflow-x:auto}}
-table{{width:100%;border-collapse:collapse;font-size:12px}}
-th{{padding:9px 14px;text-align:left;font-family:var(--mono);font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid var(--border);background:var(--s1)}}
-td{{padding:11px 14px;border-bottom:1px solid rgba(22,36,58,.6)}}
-tr:last-child td{{border-bottom:none}}
-tr:hover td{{background:rgba(0,229,255,.02)}}
-.tm{{font-family:var(--mono);font-size:11px}}
-.badge{{display:inline-block;padding:2px 8px;border-radius:4px;font-family:var(--mono);font-size:10px;font-weight:700}}
-.bWIN{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.15)}}
-.bLOSS{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.15)}}
-.bOPEN{{background:rgba(0,229,255,.1);color:var(--cyan);border:1px solid rgba(0,229,255,.15)}}
-.bBUY{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid rgba(0,255,136,.15)}}
-.bSELL{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid rgba(255,59,92,.15)}}
-
-/* DONUT */
-.dw{{display:flex;align-items:center;gap:24px}}
-.dc{{width:110px;height:110px;flex-shrink:0}}
-.ds{{flex:1}}
-.drow{{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}}
-.drow:last-child{{border-bottom:none}}
-.dlabel{{display:flex;align-items:center;gap:8px;color:var(--muted)}}
-.ddot{{width:8px;height:8px;border-radius:50%}}
-
-.empty{{text-align:center;padding:40px 20px;color:var(--muted);font-size:12px}}
-.empty-icon{{font-size:32px;margin-bottom:10px;opacity:.5}}
-
-footer{{text-align:center;padding:20px;font-size:11px;color:var(--muted);font-family:var(--mono);border-top:1px solid var(--border);margin-top:20px}}
-footer span{{color:var(--cyan)}}
-/* LESSONS */
-.litem{{padding:12px;border-bottom:1px solid var(--border);font-size:11px}}
-.litem:last-child{{border-bottom:none}}
-.lts{{color:var(--muted);font-size:9px;margin-bottom:4px;display:flex;justify-content:space-between}}
-.ltext{{line-height:1.4;color:#eee}}
-.lscore{{color:var(--gold);font-weight:700}}
-
-/* MACRO */
-.mitem{{display:flex;align-items:center;justify-content:space-between;padding:12px;border-bottom:1px solid var(--border)}}
-.mitem:last-child{{border-bottom:none}}
-.mval{{font-family:var(--mono);font-size:12px;font-weight:700}}
-.mbadge{{font-size:9px;padding:2px 6px;border-radius:4px;margin-left:8px}}
-.mUP{{color:var(--green);border:1px solid rgba(0,255,136,.2);background:rgba(0,255,136,.05)}}
-.mDOWN{{color:var(--red);border:1px solid rgba(255,59,92,.2);background:rgba(255,59,92,.05)}}
-.mNEUTRAL{{color:var(--muted);border:1px solid var(--border);background:rgba(61,90,122,.1)}}
-.risk-box{{text-align:center;padding:15px;border-radius:8px;margin-top:10px;font-weight:800;letter-spacing:1px;font-size:14px}}
-.rHIGH{{background:rgba(0,255,136,.1);color:var(--green);border:1px solid var(--green)}}
-.rLOW{{background:rgba(255,59,92,.1);color:var(--red);border:1px solid var(--red)}}
-.rNEUTRAL{{background:var(--s1);color:var(--muted);border:1px solid var(--border)}}
-
-/* HEALTH PANEL PREMIUM */
-.health-panel {{
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  padding: 16px 20px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 24px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-}}
-.hp-status {{ display: flex; align-items: center; gap: 12px; padding-right: 24px; border-right: 1px solid rgba(255,255,255,0.1); }}
-.hp-indicator {{ width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 10px currentColor; background: currentColor; }}
-.hp-label {{ font-family: var(--mono); font-weight: 700; font-size: 14px; letter-spacing: 1px; }}
-.hp-metrics {{ flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }}
-.hpm-item {{ display: flex; flex-direction: column; }}
-.hpm-value {{ font-family: var(--mono); font-size: 16px; font-weight: 700; color: #eee; }}
-.hpm-label {{ font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 2px; }}
-
-.sOK {{ color: var(--green); }}
-.sWARNING {{ color: var(--gold); }}
-.sDOWN {{ color: var(--red); }}
-
-/* BRAIN */
-.brain-item{{padding:12px;border-bottom:1px solid var(--border);position:relative}}
-.brain-item:last-child{{border-bottom:none}}
-.brain-cat{{font-family:var(--mono);font-size:9px;color:var(--gold);text-transform:uppercase;margin-bottom:4px}}
-.brain-note{{font-size:11px;line-height:1.4}}
-.brain-impact{{position:absolute;right:12px;top:12px;width:6px;height:6px;border-radius:50%}}
-.iPOSITIVE{{background:var(--green);box-shadow:0 0 5px var(--green)}}
-.iNEGATIVE{{background:var(--red);box-shadow:0 0 5px var(--red)}}
-.iNEUTRAL{{background:var(--muted)}}
-
-/* WISHES */
-.wish-item{{display:flex;align-items:center;gap:12px;padding:10px;background:rgba(0,229,255,0.03);border:1px solid var(--border);border-radius:6px;margin-bottom:8px}}
-.wish-icon{{font-size:16px}}
-.wish-text{{font-size:11px;font-weight:500;color:var(--cyan)}}
-
-/* PULSE */
-.pulse-item{{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;font-size:10px;border-bottom:1px solid var(--border)}}
-/* MARKET MONITOR */
-.mmon-item {{ display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--s1); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; }}
-.mmon-pair {{ font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--cyan); }}
-.mmon-price {{ font-family: var(--mono); font-size: 12px; color: #eee; }}
-.mmon-score {{ font-family: var(--mono); font-size: 12px; font-weight: 700; }}
-.mmon-sent {{ font-size: 10px; margin-left: 6px; }}
-
-@keyframes blink {{ 0%{{opacity:1}} 50%{{opacity:0.3}} 100%{{opacity:1}} }}
-
-/* LOGS */
-.log-container{{
-  font-family:var(--mono);font-size:10px;height:340px;overflow-y:auto;
-  background:var(--s1);padding:12px;border:1px solid var(--border);
-  scrollbar-width: thin; scrollbar-color: var(--border) transparent;
-}}
-.log-container::-webkit-scrollbar {{ width: 6px; }}
-.log-container::-webkit-scrollbar-track {{ background: transparent; }}
-.log-container::-webkit-scrollbar-thumb {{ background: var(--border); border-radius: 10px; }}
-
-.log-line{{
-  margin-bottom:6px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,0.02);
-  display:flex;line-height:1.5;
-}}
-.log-ts{{color:var(--muted);min-width:75px;flex-shrink:0}}
-.log-lvl{{width:48px;font-weight:700;margin-right:8px;flex-shrink:0}}
-.l-INFO{{color:var(--cyan)}}
-.l-WARNING{{color:var(--gold)}}
-.l-ERROR{{color:var(--red)}}
-.log-msg{{color:rgba(255,255,255,0.9);word-break:break-word}}
-
-/* MD PANEL */
-.md-exec {{ background: linear-gradient(135deg, #0a1120, #0c1a30); border: 1px solid var(--cyan); border-radius: 10px; padding: 18px; position:relative; }}
-.md-role {{ font-family: var(--mono); color: var(--gold); font-size: 11px; font-weight: 700; margin-bottom: 8px; letter-spacing: 1px; }}
-.md-status {{ display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }}
-.md-state {{ font-family: var(--mono); font-size: 10px; padding: 3px 8px; border-radius: 4px; }}
-.md-thought {{ font-size: 12px; line-height: 1.5; color: #fff; margin-bottom: 15px; font-style: italic; border-left: 2px solid var(--gold); padding-left: 12px; }}
-.md-metrics {{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }}
-.md-m {{ background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.05); border-radius:6px; padding:8px; }}
-.md-mlv {{ font-size: 9px; color: var(--muted); margin-bottom: 2px; }}
-.md-mva {{ font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--text); }}
-
-/* IMPROVEMENT REQUESTS */
-.imp-item {{ border-left: 3px solid var(--muted); padding: 10px 14px; margin-bottom: 8px; background: rgba(255,255,255,0.02); border-radius: 0 6px 6px 0; }}
-.imp-HIGH {{ border-left-color: var(--red); }}
-.imp-MEDIUM {{ border-left-color: var(--gold); }}
-.imp-LOW {{ border-left-color: var(--cyan); }}
-.imp-header {{ display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }}
-.imp-priority {{ font-family: var(--mono); font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 700; }}
-.pHIGH {{ background:rgba(255,59,92,.15); color:var(--red); }}
-.pMEDIUM {{ background:rgba(255,208,0,.15); color:var(--gold); }}
-.pLOW {{ background:rgba(0,229,255,.15); color:var(--cyan); }}
-.imp-cat {{ font-size: 9px; color: var(--muted); font-family: var(--mono); }}
-.imp-title {{ font-size: 12px; font-weight: 600; color: var(--text); }}
-.imp-desc {{ font-size: 10px; color: rgba(200,216,232,0.7); line-height: 1.5; margin-top: 4px; }}
-
-/* STRATEGY PERFORMANCE */
-.strat-row {{ display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 11px; }}
-.strat-row:last-child {{ border-bottom: none; }}
-.strat-name {{ font-family: var(--mono); font-weight: 700; font-size: 12px; color: var(--cyan); }}
-.strat-wr {{ font-family: var(--mono); font-size: 11px; }}
-.strat-pnl {{ font-family: var(--mono); font-weight: 600; }}
-
-/* MONTHLY METRICS */
-.monthly-table {{ width:100%; border-collapse:collapse; font-size:11px; }}
-.monthly-table th {{ padding:7px 12px; font-family:var(--mono); font-size:9px; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); background:var(--s1); text-align:left; }}
-.monthly-table td {{ padding:9px 12px; border-bottom:1px solid rgba(22,36,58,.6); }}
-
-/* SIGNAL ONLY BADGE */
-.signal-only-banner {{ background: linear-gradient(135deg, rgba(255,208,0,0.1), rgba(255,208,0,0.05)); border: 1px solid var(--gold); border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }}
-.signal-only-banner .sob-icon {{ font-size: 20px; }}
-.signal-only-banner .sob-text {{ font-family: var(--mono); font-size: 12px; color: var(--gold); font-weight: 700; }}
-.signal-only-banner .sob-sub {{ font-size: 10px; color: var(--muted); }}
+  table th {{ font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; color: #64748b; font-weight: 600; padding-bottom: 10px; text-align: left; }}
+  table td {{ padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 13px; }}
+  tr:last-child td {{ border-bottom: none; }}
+  
+  .pulse-dot {{ width: 8px; height: 8px; border-radius: 50%; background: var(--pos); box-shadow: 0 0 10px var(--pos); animation: pulse 2s infinite; }}
+  @keyframes pulse {{ 0% {{ opacity: 1; transform: scale(1); }} 50% {{ opacity: 0.4; transform: scale(1.2); }} 100% {{ opacity: 1; transform: scale(1); }} }}
+  
+  .md-box {{ background: linear-gradient(135deg, rgba(8,15,26,0.8), rgba(12,26,45,0.9)); border: 1px solid rgba(0,229,255,0.3); box-shadow: inset 0 0 20px rgba(0,229,255,0.05); }}
+  .glow-text {{ text-shadow: 0 0 10px currentColor; }}
 </style>
 </head>
-<body>
-<div class="page">
+<body class="antialiased selection:bg-accent selection:text-black">
 
-<header class="header">
-  <div class="hlogo">
-    <div class="hmark">🤖</div>
-    <div>
-      <div class="htitle">TRADING BOT</div>
-      <div class="hsub">Paper Trading · GitHub Actions + Turso</div>
-    </div>
-  </div>
-  <div class="hright">
-    <div class="hts">Actualizado: <span id="lastUpdate">...</span></div>
-    <div class="live">ACTIVO 24/7</div>
-  </div>
-</header>
+<div class="max-w-[1400px] mx-auto p-4 md:p-6 lg:p-8 space-y-6">
 
-{signal_only_html}
-
-<div class="health-panel">
-    <div class="hp-status s{h_class}">
-        <div class="hp-indicator"></div>
-        <div class="hp-label">{h_text}</div>
-    </div>
-    <div class="hp-metrics">
-        <div class="hpm-item">
-            <div class="hpm-label">Latiendo</div>
-            <div class="hpm-value">{last_hb}</div>
+  <!-- HEADER -->
+  <header class="glass-panel animate__animated animate__fadeInDown">
+    <div class="flex flex-col md:flex-row items-center justify-between p-5 md:p-6 bg-gradient-to-r from-transparent via-[rgba(0,229,255,0.03)] to-transparent border-t-2 border-t-accent">
+      <div class="flex items-center gap-5">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0c1a30] to-[#040810] border border-accent flex items-center justify-center text-3xl shadow-[0_0_20px_rgba(0,229,255,0.2)]">🤖</div>
+        <div>
+          <h1 class="font-mono text-xl font-extrabold tracking-widest text-accent glow-text">APEX AI DIRECTOR</h1>
+          <p class="text-xs text-slate-400 mt-1 font-medium">Turso DB · GitHub Actions · Llama 3.3 70B</p>
         </div>
-        <div class="hpm-item">
-            <div class="hpm-label">Reintentos/Fallos</div>
-            <div class="hpm-value">{err_24h}</div>
+      </div>
+      <div class="text-right mt-4 md:mt-0">
+        <div class="font-mono text-xs tracking-wider text-slate-400">SYNC: <span id="lastUpdate" class="text-warn font-bold">...</span></div>
+        <div class="flex items-center justify-end gap-2 mt-2">
+          <div class="pulse-dot"></div>
+          <span class="font-mono text-xs font-bold text-pos tracking-wide">SYSTEM ONLINE</span>
         </div>
-        <div class="hpm-item">
-            <div class="hpm-label">Acciones Autónomas</div>
-            <div class="hpm-value">{act_24h}</div>
-        </div>
+      </div>
     </div>
-</div>
+  </header>
 
-<div class="kpis" id="kpis"></div>
-
-<div class="g2">
-  <div class="panel">
-    <div class="ph"><span>📈</span><span class="phtitle">Evolución del Balance</span><span class="phsub">demo USD</span></div>
-    <div class="pb"><div class="cbox"><canvas id="balChart"></canvas></div></div>
-  </div>
-  <div class="md-exec">
-    <div class="md-role">👤 MANAGING DIRECTOR (MD)</div>
-    <div id="mdSummary">
-        <div class="md-status">
-          <span class="md-state {'bLOSS' if is_paused else 'bWIN'}">{ 'PAUSADO' if is_paused else 'OPERATIVO' }</span>
-          <span class="md-state dNEUTRAL" style="color:var(--gold)">{ md_model }</span>
-          <span class="hts" style="margin-left:auto">{ md_time }</span>
+  <!-- SIGNAL BANNERS -->
+  {'''<div class="glass-panel animate__animated animate__fadeIn relative overflow-hidden bg-warn/5 border-warn/30">
+        <div class="absolute left-0 top-0 bottom-0 w-1 bg-warn"></div>
+        <div class="p-4 flex items-center gap-4">
+            <div class="text-2xl">📊</div>
+            <div>
+                <h3 class="font-mono text-warn font-bold text-sm tracking-wide">MODO SEÑAL ACTIVO</h3>
+                <p class="text-xs text-slate-400 mt-1">El bot NO ejecuta trades automáticamente. Envia señales por Telegram.</p>
+            </div>
         </div>
-        <div class="md-thought">"{ md_thought }"</div>
-        <div class="md-metrics">
-          <div class="md-m"><div class="md-mlv">ESTRATEGIA</div><div class="md-mva">{ config.get('strategy', '---') }</div></div>
-          <div class="md-m"><div class="md-mlv">SCORE MÍN</div><div class="md-mva">{ config.get('min_score', '5.0') }/10</div></div>
-          <div class="md-m"><div class="md-mlv">STOP LOSS</div><div class="md-mva">{ config.get('sl_atr', '1.2') }x ATR</div></div>
-          <div class="md-m"><div class="md-mlv">PARES PAUS.</div><div class="md-mva">{ paused_pairs_count }</div></div>
-        </div>
-    </div>
-  </div>
-</div>
+    </div>''' if is_signal_only else ''}
 
-<div class="g2b">
-  <div class="panel">
-    <div class="ph"><span>📋</span><span class="phtitle">Trades Recientes</span></div>
-    <div class="tw">
-      <table>
-        <thead><tr><th>Par</th><th>Dir</th><th>Apertura</th><th>P&amp;L</th><th>Estado</th><th>Fecha</th></tr></thead>
-        <tbody id="tbody"></tbody>
-      </table>
+  <!-- KPIs -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4" id="kpis"></div>
+
+  <!-- MAIN GRID -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- BALANCE CHART -->
+    <div class="glass-panel lg:col-span-2 animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">
+      <div class="panel-header">
+        <span class="text-lg">📈</span><h2 class="panel-title">Evolución del Balance</h2>
+        <span class="text-xs text-slate-500 ml-auto font-mono">USD DEMO</span>
+      </div>
+      <div class="panel-body h-[280px]">
+        <canvas id="balChart"></canvas>
+      </div>
     </div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🎯</span><span class="phtitle">Win Rate</span></div>
-    <div class="pb">
-      <div class="dw">
-        <div class="dc"><canvas id="wrChart"></canvas></div>
-        <div class="ds" id="dstats"></div>
+
+    <!-- AI DIRECTOR PANEL -->
+    <div class="glass-panel md-box flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+      <div class="p-5 flex-1 flex flex-col">
+        <div class="font-mono text-xs text-warn font-bold tracking-widest mb-4 flex items-center gap-2">
+          <span class="text-base">🧠</span> MANAGING DIRECTOR
+        </div>
+        
+        <div class="flex items-center gap-3 mb-4">
+          <span class="badge { 'bLOSS' if is_paused else 'bWIN' } px-3 py-1 text-xs">{ 'PAUSADO' if is_paused else 'OPERATIVO' }</span>
+          <span class="badge border-warn/30 text-warn bg-warn/10">{ md_model }</span>
+          <span class="font-mono text-xs text-slate-400 ml-auto">{ md_time }</span>
+        </div>
+        
+        <div class="flex-1 bg-black/30 border border-white/5 rounded-xl p-4 mb-5 relative">
+          <div class="absolute -left-1 top-4 bottom-4 w-1 bg-accent/50 rounded-r"></div>
+          <p class="text-sm leading-relaxed text-slate-200 italic font-medium">"{ md_thought }"</p>
+        </div>
+        
+        <div class="grid grid-cols-2 gap-3 mt-auto">
+          <div class="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
+            <div class="text-[9px] font-mono text-slate-500 mb-1 tracking-wider uppercase">Estrategia</div>
+            <div class="font-mono text-xs font-bold text-accent truncate">{ config.get('strategy', '---') }</div>
+          </div>
+          <div class="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
+            <div class="text-[9px] font-mono text-slate-500 mb-1 tracking-wider uppercase">Score Mínimo</div>
+            <div class="font-mono text-xs font-bold text-white"><span class="text-accent">{ config.get('min_score', '5.0') }</span> / 10</div>
+          </div>
+          <div class="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
+            <div class="text-[9px] font-mono text-slate-500 mb-1 tracking-wider uppercase">Riesgo / ATR</div>
+            <div class="font-mono text-xs font-bold text-warn">{ config.get('sl_atr', '1.2') }x</div>
+          </div>
+          <div class="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
+            <div class="text-[9px] font-mono text-slate-500 mb-1 tracking-wider uppercase">Pares Pausados</div>
+            <div class="font-mono text-xs font-bold text-neg">{ paused_pairs_count }</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
-  <div class="panel">
-    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
-    <div class="pb" id="macroBox"></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🧠</span><span class="phtitle">Memoria de Corto Plazo</span><span class="phsub">IA Reasoning Log</span></div>
-    <div class="pb"><div id="brainFeed"></div></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>💡</span><span class="phtitle">Peticiones de la IA</span><span class="phsub">Autonomous Requests</span></div>
-    <div class="pb"><div id="wishFeed"></div></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🎯</span><span class="phtitle">Análisis de Feedback</span><span class="phsub">Post-Mortem Engine</span></div>
-    <div class="pb"><div id="lessonFeed"></div></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🔎</span><span class="phtitle">Monitor de Mercado</span><span class="phsub">Puntajes en vivo</span></div>
-    <div class="pb" id="marketMonitor"></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🔬</span><span class="phtitle">Rendimiento por Estrategia</span><span class="phsub">Últimos 30 días</span></div>
-    <div class="pb" id="stratBox"></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>💡</span><span class="phtitle">Solicitudes de Mejora</span><span class="phsub">El bot te pide ayuda</span></div>
-    <div class="pb" id="improvBox"></div>
-  </div>
-  <div class="panel" style="grid-column: 1 / -1">
-    <div class="ph"><span>📅</span><span class="phtitle">Métricas Mensuales</span><span class="phsub">Rendimiento histórico por mes</span></div>
-    <div class="pb">
-      <div class="tw">
-        <table class="monthly-table">
-          <thead><tr><th>Mes</th><th>Trades</th><th>Win %</th><th>P&amp;L</th><th>Max DD</th><th>Mejor Par</th><th>Peor Par</th></tr></thead>
-          <tbody id="monthlyTbody"></tbody>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- TRADES TABLE -->
+    <div class="glass-panel lg:col-span-2 animate__animated animate__fadeInUp" style="animation-delay: 0.3s;">
+      <div class="panel-header justify-between">
+        <div class="flex items-center gap-2"><span class="text-lg">📋</span><h2 class="panel-title">Trades Recientes</h2></div>
+      </div>
+      <div class="panel-body overflow-x-auto">
+        <table class="w-full text-left">
+          <thead><tr><th>Par</th><th>Dir</th><th>Entrada</th><th>P&L</th><th>Estado</th><th>Cierre/Apertura</th></tr></thead>
+          <tbody id="tbody"></tbody>
         </table>
       </div>
     </div>
+
+    <!-- WIN RATE DONUT -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.4s;">
+      <div class="panel-header"><span class="text-lg">🎯</span><h2 class="panel-title">Precisión</h2></div>
+      <div class="panel-body flex-1 flex flex-col justify-center">
+        <div class="flex items-center gap-6">
+          <div class="w-28 h-28 shrink-0 relative">
+            <canvas id="wrChart"></canvas>
+            <div class="absolute inset-0 flex items-center justify-center font-mono font-bold text-xl text-white" id="wrCenter"></div>
+          </div>
+          <div class="flex-1 space-y-3" id="dstats"></div>
+        </div>
+      </div>
+    </div>
   </div>
-  <div class="panel" style="grid-column: 1 / -1">
-    <div class="ph"><span>📠</span><span class="phtitle">Registro de Actividad</span><span class="phsub">Live Console Logs</span></div>
-    <div class="pb"><div class="log-container" id="logBox"></div></div>
+
+  <!-- SECONDARY ROW -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <!-- MARKET MONITOR -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.5s;">
+      <div class="panel-header"><span class="text-base">🔎</span><h2 class="panel-title">Radar Mercado</h2></div>
+      <div class="panel-body p-3 flex-1 custom-scroll overflow-y-auto max-h-[300px] space-y-2" id="marketMonitor"></div>
+    </div>
+    
+    <!-- MACRO -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.6s;">
+      <div class="panel-header"><span class="text-base">🌍</span><h2 class="panel-title">Macro Contexto</h2></div>
+      <div class="panel-body flex-1 flex flex-col justify-around" id="macroBox"></div>
+    </div>
+
+    <!-- STRATEGY PERF -->
+    <div class="glass-panel lg:col-span-2 flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.8s;">
+      <div class="panel-header"><span class="text-base">🔬</span><h2 class="panel-title">Rendimiento por Estrategia</h2></div>
+      <div class="panel-body p-0 custom-scroll overflow-y-auto max-h-[300px]" id="stratBox"></div>
+    </div>
   </div>
-</div>
 
 </div>
-<footer>🤖 Trading Bot · Paper Trading · <span>Sin dinero real</span> · Próxima actualización ~15 min</footer>
+
+<footer class="text-center py-8 font-mono text-[10px] text-slate-500 border-t border-border_light mt-8">
+  <p>🚀 APEX AI DIRECTOR v2.0 <span class="mx-2">|</span> PAPER TRADING <span class="mx-2">|</span> <span class="text-accent glow-text">NO HAY DINERO REAL INVOLUCRADO</span></p>
+</footer>
 
 <script>
 const D = {data_json};
-const f=(n,d=2)=>n==null?'—':Number(n).toLocaleString('es-AR',{{minimumFractionDigits:d,maximumFractionDigits:d}});
-const fd=ts=>{{if(!ts)return'—';try{{return new Date(ts).toLocaleString('es-AR',{{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}})}}catch{{return String(ts).slice(0,16)}}}};
+const f=(n,d=2)=>n==null?'—':Number(n).toLocaleString('en-US',{{minimumFractionDigits:d,maximumFractionDigits:d}});
+const fd=ts=>{{if(!ts)return'—';try{{return new Date(ts).toLocaleString('es-ES',{{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}})}}catch{{return String(ts).slice(0,16)}}}};
 
-// Update header time
 document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 
 // KPIs
 (()=>{{
-  const ret=D.balance?((D.balance-10000)/10000*100):0;
-  document.getElementById('kpis').innerHTML=`
-    <div class="kpi"><div class="ka c"></div><div class="klabel">💰 Balance Demo</div><div class="kval c">$${{f(D.balance)}}</div><div class="ksub">Inicial: $10,000</div></div>
-    <div class="kpi"><div class="ka ${{ret>=0?'g':'r'}}"></div><div class="klabel">📊 Retorno</div><div class="kval ${{ret>=0?'g':'r'}}">${{ret>=0?'+':''}}${{f(ret)}}%</div><div class="ksub">P&L: $${{f(D.total_pnl)}}</div></div>
-    <div class="kpi"><div class="ka y"></div><div class="klabel">🎯 Win Rate</div><div class="kval y">${{f(D.win_rate,1)}}%</div><div class="ksub">${{D.wins}}W / ${{D.losses}}L</div></div>
-    <div class="kpi"><div class="ka c"></div><div class="klabel">📈 Trades</div><div class="kval c">${{D.total_trades}}</div><div class="ksub">${{D.open_trades}} abiertos</div></div>
-    <div class="kpi" id="sentKpi"></div>
+  const ret = D.balance ? ((D.balance-10000)/10000*100) : 0;
+  const kpis = document.getElementById('kpis');
+  
+  const makeKpi = (icon, label, value, sub, colorClass, highlight=false) => `
+    <div class="glass-panel relative ${{highlight?'bg-accent/5 border-accent/30':''}} group">
+        ${{highlight ? '<div class="absolute inset-x-0 top-0 h-0.5 bg-accent shadow-[0_0_10px_#00e5ff]"></div>' : ''}}
+        <div class="p-4 md:p-5">
+            <div class="flex items-center gap-2 mb-2 text-slate-400">
+                <span class="text-sm">${{icon}}</span>
+                <span class="font-mono text-[10px] uppercase tracking-widest font-bold">${{label}}</span>
+            </div>
+            <div class="font-mono text-2xl md:text-3xl font-extrabold ${{colorClass}} tracking-tight transition-transform group-hover:scale-[1.02]">${{value}}</div>
+            <div class="text-[10px] text-slate-500 mt-2 font-medium">${{sub}}</div>
+        </div>
+    </div>
   `;
+
+  const retColor = ret >= 0 ? 'text-pos' : 'text-neg';
   
-  // Calculate average sentiment
-  const sigs = D.signals || [];
-  const avgSent = sigs.length ? sigs.reduce((a,b)=>a+(Number(b.sentiment)||0), 0) / sigs.length : 0;
-  const sentColor = avgSent > 0.1 ? 'g' : avgSent < -0.1 ? 'r' : 'y';
-  const sentLabel = avgSent > 0.4 ? 'MUY ALCISTA' : avgSent > 0.1 ? 'ALCISTA' : avgSent < -0.4 ? 'MUY BAJISTA' : avgSent < -0.1 ? 'BAJISTA' : 'NEUTRAL';
-  
-  document.getElementById('sentKpi').innerHTML = `
-    <div class="ka ${{sentColor}}"></div>
-    <div class="klabel">🎭 Sentimiento</div>
-    <div class="kval ${{sentColor}}">${{sentLabel}}</div>
-    <div class="ksub">Score: ${{avgSent.toFixed(2)}} (Promedio)</div>
+  kpis.innerHTML = `
+    ${{makeKpi('💰', 'Balance Demo', '$'+f(D.balance), 'Inicial: $10,000', 'text-white', true)}}
+    ${{makeKpi('📈', 'Retorno (P&L)', (ret>=0?'+':'')+f(ret)+'%', '$'+f(D.total_pnl), retColor)}}
+    ${{makeKpi('🎯', 'Win Rate', f(D.win_rate, 1)+'%', D.wins+'W / '+D.losses+'L', 'text-warn')}}
+    ${{makeKpi('📊', 'Total Trades', D.total_trades, D.open_trades+' Activos', 'text-accent')}}
   `;
 }})();
 
-// Balance chart
+// Chart Theme setup
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'JetBrains Mono', monospace";
+
+// Balance Chart
 (()=>{{
-  const h=D.balance_history||[];if(!h.length)return;
-  new Chart(document.getElementById('balChart'),{{type:'line',data:{{labels:h.map(x=>fd(x.timestamp)),datasets:[{{data:h.map(x=>parseFloat(x.balance)),borderColor:'#00e5ff',backgroundColor:'rgba(0,229,255,0.05)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.4}}]}},options:{{responsive:true,maintainAspectRatio:false,plugins:{{legend:{{display:false}}}},scales:{{x:{{display:false}},y:{{grid:{{color:'rgba(22,36,58,1)'}},ticks:{{color:'#3d5a7a',font:{{family:'IBM Plex Mono',size:10}},callback:v=>'$'+v.toLocaleString()}}}}}}}}}});
+  const h=D.balance_history||[]; 
+  if(!h.length) return;
+  const ctx = document.getElementById('balChart').getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 250);
+  gradient.addColorStop(0, 'rgba(0, 229, 255, 0.4)');
+  gradient.addColorStop(1, 'rgba(0, 229, 255, 0.0)');
+
+  new Chart(ctx, {{
+    type: 'line',
+    data: {{
+      labels: h.map(x=>fd(x.timestamp)),
+      datasets: [{{
+        data: h.map(x=>parseFloat(x.balance)),
+        borderColor: '#00e5ff', borderWidth: 2, pointRadius: 0, hoverPointRadius: 6,
+        fill: true, backgroundColor: gradient, tension: 0.4
+      }}]
+    }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      plugins: {{ legend: {{ display: false }}, tooltip: {{ mode: 'index', intersect: false, backgroundColor: 'rgba(15,23,42,0.9)', titleColor: '#fff', bodyColor: '#00e5ff', padding: 10, borderColor: 'rgba(0,229,255,0.3)', borderWidth: 1 }} }},
+      scales: {{
+        x: {{ display: false }},
+        y: {{ grid: {{ color: 'rgba(255,255,255,0.05)', drawBorder: false }}, ticks: {{ callback: v => '$'+v.toLocaleString() }} }}
+      }},
+      interaction: {{ mode: 'nearest', axis: 'x', intersect: false }}
+    }}
+  }});
 }})();
 
-
-// Trades
+// Trades Table
 (()=>{{
-  const tb=document.getElementById('tbody'),t=D.trades||[];
-  if(!t.length){{tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-icon">📋</div><p>Sin trades aún</p></div></td></tr>';return;}}
-  tb.innerHTML=t.slice(0,12).map(x=>{{
-    const p=x.pnl!=null?`<span class="tm" style="color:${{Number(x.pnl)>=0?'var(--green)':'var(--red)'}}">${{Number(x.pnl)>=0?'+':''}}$${{f(x.pnl)}}</span>`:'<span style="color:var(--muted)">—</span>';
-    return`<tr><td class="tm">${{x.pair}}</td><td><span class="badge b${{x.direction}}">${{x.direction}}</span></td><td class="tm">$${{f(x.open_price,4)}}</td><td>${{p}}</td><td><span class="badge b${{x.status}}">${{x.status}}</span></td><td style="color:var(--muted);font-size:11px">${{fd(x.open_time)}}</td></tr>`;
+  const tb = document.getElementById('tbody'), t = D.trades||[];
+  if(!t.length) {{ tb.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500"><div class="text-3xl mb-2 opacity-50">📋</div>Sin trades históricos</td></tr>`; return; }}
+  
+  tb.innerHTML = t.slice(0,8).map(x => {{
+    const pnlFloat = Number(x.pnl);
+    const pnlStr = x.pnl != null ? `<span class="font-mono font-bold ${{pnlFloat>=0?'text-pos':'text-neg'}}">${{pnlFloat>=0?'+':''}}$${{f(pnlFloat)}}</span>` : '<span class="text-slate-600">—</span>';
+    return `<tr class="hover:bg-white/5 transition-colors group">
+      <td class="font-mono font-bold text-accent group-hover:pl-2 transition-all">${{x.pair}}</td>
+      <td><span class="badge b${{x.direction}}">${{x.direction}}</span></td>
+      <td class="font-mono">$${{f(x.open_price, 4)}}</td>
+      <td>${{pnlStr}}</td>
+      <td><span class="badge b${{x.status}} shadow-sm">${{x.status}}</span></td>
+      <td class="text-[10px] text-slate-400 font-mono">${{fd(x.close_time || x.open_time)}}</td>
+    </tr>`;
   }}).join('');
 }})();
 
-// Donut
+// Win Rate Donut
 (()=>{{
-  const w=D.wins||0,l=D.losses||0,tot=w+l;
-  if(!tot){{document.getElementById('dstats').innerHTML='<div style="color:var(--muted);font-size:12px;padding:8px">Sin trades cerrados aún</div>';return;}}
-  new Chart(document.getElementById('wrChart'),{{type:'doughnut',data:{{labels:['Ganados','Perdidos'],datasets:[{{data:[w,l],backgroundColor:['rgba(0,255,136,0.75)','rgba(255,59,92,0.75)'],borderColor:['#00ff88','#ff3b5c'],borderWidth:1}}]}},options:{{cutout:'74%',plugins:{{legend:{{display:false}}}}}}}});
-  document.getElementById('dstats').innerHTML=`
-    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--green)"></div>Ganadores</div><div style="color:var(--green);font-family:var(--mono);font-weight:600">${{w}} (${{f(w/tot*100,1)}}%)</div></div>
-    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--red)"></div>Perdedores</div><div style="color:var(--red);font-family:var(--mono);font-weight:600">${{l}} (${{f(l/tot*100,1)}}%)</div></div>
-    <div class="drow"><div class="dlabel"><div class="ddot" style="background:var(--cyan)"></div>Abiertos</div><div style="font-family:var(--mono);font-weight:600">${{D.open_trades}}</div></div>
-  `;
-}})();
-
-// Lessons
-(()=>{{
-  const el=document.getElementById('lessonFeed'),t=D.trades||[];
-  const lessons = t.filter(x=>x.lesson);
-  if(!lessons.length){{el.innerHTML='<div class="empty"><div class="empty-icon">🧠</div><p>Esperando cierre de trades para generar aprendizaje...</p></div>';return;}}
-  el.innerHTML=lessons.slice(0,5).map(x=>`
-    <div class="litem">
-      <div class="lts"><span>${{fd(x.open_time)}} — ${{x.pair}}</span><span class="lscore">${{f(x.performance_score,1)}}/10</span></div>
-      <div class="ltext">${{x.lesson}}</div>
-    </div>
-  `).join('');
+  const w = D.wins||0, l = D.losses||0, tot = w+l;
+  if(tot) {{
+      document.getElementById('wrCenter').innerText = f(w/tot*100,0)+'%';
+      new Chart(document.getElementById('wrChart'), {{
+        type: 'doughnut',
+        data: {{ labels: ['Ganados','Perdidos'], datasets: [{{ data: [w,l], backgroundColor: ['#00ff88','#ff3b5c'], borderColor: 'transparent', borderWidth: 0 }}] }},
+        options: {{ cutout: '80%', plugins: {{ legend: {{ display: false }}, tooltip: {{ callbacks: {{ label: (c)=> ` ${{c.formattedValue}} Trades` }} }} }} }}
+      }});
+      
+      document.getElementById('dstats').innerHTML = `
+        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-pos"></span>Ganadores</span>
+            <span class="font-mono font-bold text-pos">${{w}} <span class="text-xs opacity-70">(${{f(w/tot*100,0)}}%)</span></span>
+        </div>
+        <div class="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+            <span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-neg"></span>Perdedores</span>
+            <span class="font-mono font-bold text-neg">${{l}} <span class="text-xs opacity-70">(${{f(l/tot*100,0)}}%)</span></span>
+        </div>
+        <div class="flex justify-between items-center text-sm">
+            <span class="flex items-center gap-2 text-slate-400"><span class="w-2 h-2 rounded-full bg-accent animate-pulse"></span>Activos</span>
+            <span class="font-mono font-bold text-white">${{D.open_trades}}</span>
+        </div>
+      `;
+  }} else {{
+      document.getElementById('dstats').innerHTML = '<div class="text-center text-slate-500 w-full mt-10">Esperando Cierres</div>';
+  }}
 }})();
 
 // Market Monitor
 (()=>{{
-  const el=document.getElementById('marketMonitor'), m=D.market_monitor||[];
-  if(!m.length){{el.innerHTML='<div class="empty"><div class="empty-icon">🔎</div><p>Sincronizando mercado...</p></div>';return;}}
+  const el = document.getElementById('marketMonitor'), m = D.market_monitor||[];
+  if(!m.length) {{ el.innerHTML = '<div class="text-center p-4 text-slate-500">Sincronizando feed...</div>'; return; }}
+  
   el.innerHTML = m.map(x => {{
-    const sColor = x.score >= 5 ? 'var(--green)' : x.score >= 3 ? 'var(--gold)' : 'var(--muted)';
-    const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
-    return `
-      <div class="mmon-item">
+    const sColor = x.score >= 5 ? 'text-pos' : x.score >= 3 ? 'text-warn' : 'text-slate-500';
+    const bgHov = x.score >= 5 ? 'hover:bg-pos/10 hover:border-pos/30' : 'hover:bg-white/5';
+    const icon = x.sentiment > 0.1 ? '<span class="text-pos">▲</span>' : x.sentiment < -0.1 ? '<span class="text-neg">▼</span>' : '<span class="text-slate-600">➖</span>';
+    
+    return `<div class="flex items-center justify-between p-3 rounded-xl border border-white/5 bg-black/20 transition-all ${{bgHov}} cursor-default">
         <div>
-          <div class="mmon-pair">${{x.pair}} <span class="mmon-sent" title="Sentimiento: ${{Number(x.sentiment).toFixed(2)}}">${{sentIcon}}</span></div>
-          <div class="mmon-price">$${{f(x.price, x.pair.includes('=X')?4:2)}}</div>
+            <div class="font-mono font-bold text-sm text-accent flex items-center gap-2">${{x.pair}} ${{icon}}</div>
+            <div class="font-mono text-xs text-slate-300">$${{f(x.price, x.pair.includes('=X')?4:2)}}</div>
         </div>
-        <div class="mmon-score" style="color:${{sColor}}">${{f(x.score,1)}}/10</div>
-      </div>
-    `;
+        <div class="font-mono text-sm font-bold ${{sColor}} bg-black/40 px-2 py-1 rounded">${{f(x.score,1)}}/10</div>
+    </div>`;
   }}).join('');
 }})();
 
-// Macro
+// Macro Context
 (()=>{{
-  const el=document.getElementById('macroBox'), m=D.macro;
-  if(!m){{el.innerHTML='<div class="empty"><div class="empty-icon">🌍</div><p>Sincronizando datos macro...</p></div>';return;}}
+  const el = document.getElementById('macroBox'), m = D.macro;
+  if(!m) {{ el.innerHTML = '<div class="text-center p-4 text-slate-500">Recabando inteligencia global...</div>'; return; }}
   
-  el.innerHTML=`
-    <div class="mitem">
-      <div><div style="font-size:12px;font-weight:600">DXY (Dollar Index)</div><div style="font-size:10px;color:var(--muted)">Inversamente correlacionado</div></div>
-      <div class="mval">${{f(m.dxy_val)}} <span class="mbadge m${{m.dxy_trend}}">${{m.dxy_trend}}</span></div>
+  el.innerHTML = `
+    <div class="flex justify-between items-center p-3 border-b border-white/5">
+        <div><h4 class="font-bold text-sm text-slate-200">DXY (Dollar)</h4><span class="text-[10px] text-slate-500">Inverso a Cripto</span></div>
+        <div class="text-right">
+            <div class="font-mono font-bold text-sm">${{f(m.dxy_val)}}</div>
+            <span class="badge m${{m.dxy_trend}}">${{m.dxy_trend}}</span>
+        </div>
     </div>
-    <div class="mitem">
-      <div><div style="font-size:12px;font-weight:600">Nasdaq 100</div><div style="font-size:10px;color:var(--muted)">Correlación con riesgo</div></div>
-      <div class="mval">${{f(m.nasdaq_val,0)}} <span class="mbadge m${{m.nasdaq_trend}}">${{m.nasdaq_trend}}</span></div>
+    <div class="flex justify-between items-center p-3 border-b border-white/5">
+        <div><h4 class="font-bold text-sm text-slate-200">Nasdaq 100</h4><span class="text-[10px] text-slate-500">Apetito tecnológico</span></div>
+        <div class="text-right">
+            <div class="font-mono font-bold text-sm">${{f(m.nasdaq_val, 0)}}</div>
+            <span class="badge m${{m.nasdaq_trend}}">${{m.nasdaq_trend}}</span>
+        </div>
     </div>
-    <div class="risk-box r${{m.risk_appetite}}">
-      APETITO POR EL RIESGO: ${{m.risk_appetite}}
-    </div>
-    <div style="font-size:9px;color:var(--muted);text-align:center;margin-top:10px">
-      Sincronizado: ${{fd(m.timestamp)}}
+    <div class="mt-4 p-3 rounded-xl border ${{m.risk_appetite=='RISK_ON'?'bg-pos/10 border-pos/30 text-pos': m.risk_appetite=='RISK_OFF'?'bg-neg/10 border-neg/30 text-neg':'bg-white/5 border-white/10 text-slate-400'}} text-center">
+        <div class="text-[10px] font-mono tracking-widest uppercase mb-1">Entorno de Riesgo</div>
+        <div class="font-bold tracking-wider">${{m.risk_appetite}}</div>
     </div>
   `;
 }})();
 
-// Bot Brain History
+// Strategy Perf
 (()=>{{
-  const el=document.getElementById('brainFeed'), m=D.bot_memory||[];
-  if(!m.length){{el.innerHTML='<div class="empty"><div class="empty-icon">💭</div><p>La IA aún no ha generado reflexiones...</p></div>';return;}}
-  el.innerHTML = m.slice(0, 8).map(x => `
-    <div class="brain-item">
-      <div class="brain-cat">${{x.category}}</div>
-      <div class="brain-impact i${{x.impact}}"></div>
-      <div class="brain-note" style="color:${{x.category==='LLM_REASONING'?'var(--cyan)':'#eee'}}">${{x.note}}</div>
-      <div style="font-size:8px;color:var(--muted);margin-top:6px">${{fd(x.timestamp)}}</div>
-    </div>
-  `).join('');
-}})();
-
-// Bot Wishes
-(()=>{{
-  const el=document.getElementById('wishFeed'), w=D.bot_wishes||[];
-  if(!w.length){{el.innerHTML='<div class="empty"><div class="empty-icon">💡</div><p>No hay peticiones pendientes.</p></div>';return;}}
-  el.innerHTML = w.map(x => `
-    <div class="wish-item">
-      <div class="wish-icon">${{x.status === 'ACTION' ? '⚡' : '💡'}}</div>
-      <div class="wish-text">${{x.wish}}</div>
-    </div>
-  `).join('');
-}})();
-
-// Activity Logs
-(()=>{{
-  const el=document.getElementById('logBox'), logs=D.system_logs||[];
-  if(!logs.length){{el.innerHTML='<div class="empty"><div class="empty-icon">📠</div><p>Esperando registros...</p></div>';return;}}
-  el.innerHTML = logs.map(l => `
-    <div class="log-line">
-      <div class="log-ts">${{fd(l.timestamp).split(',')[1]}}</div>
-      <div class="log-lvl l-${{l.level}}">[${{l.level}}]</div>
-      <div class="log-msg">${{l.message}}</div>
-    </div>
-  `).join('');
-}})();
-
-// Strategy Performance
-(()=>{{
-  const el=document.getElementById('stratBox'), s=D.strategy_performance||[];
-  if(!s.length){{
-    el.innerHTML='<div class="empty"><div class="empty-icon">🔬</div><p>Sin datos de estrategia aún.<br><small>Se genera al cerrar los primeros trades.</small></p></div>';
-    return;
-  }}
+  const el = document.getElementById('stratBox'), s = D.strategy_performance||[];
+  if(!s.length) {{ el.innerHTML = '<div class="p-6 text-center text-slate-500">Insuficientes datos para reportar estrategias.</div>'; return; }}
+  
   el.innerHTML = s.map(x=>{{
     const total=parseInt(x.total)||0, wins=parseInt(x.wins)||0;
     const wr = total>0? (wins/total*100).toFixed(0) : 0;
     const pnl = parseFloat(x.total_pnl)||0;
-    const pnlColor = pnl>=0?'var(--green)':'var(--red)';
-    const wrColor  = wr>=50?'var(--green)':wr>=35?'var(--gold)':'var(--red)';
-    const nameMap = {{'B_EMA_PULLBACK':'EMA Pullback','R_RSI_EXTREME':'RSI Extremo','M_MACD_MOMENTUM':'MACD Momentum','ALL':'Todas','PAUSE_ALL':'Pausada'}};
-    const name = nameMap[x.strategy] || x.strategy;
-    return `<div class="strat-row">
-      <div><div class="strat-name">${{name}}</div><div style="font-size:9px;color:var(--muted)">${{total}} trades | Avg: $${{f(x.avg_pnl)}}</div></div>
-      <div style="display:flex;gap:20px;align-items:center">
-        <div class="strat-wr" style="color:${{wrColor}}">${{wr}}% WR</div>
-        <div class="strat-pnl" style="color:${{pnlColor}}">${{pnl>=0?'+':''}}$${{f(pnl)}}</div>
-      </div>
+    const wrColor = wr>=50?'text-pos':wr>=35?'text-warn':'text-neg';
+    const map = {{'B_EMA_PULLBACK':'EMA Pullback','R_RSI_EXTREME':'RSI Extremo','M_MACD_MOMENTUM':'MACD Momentum','ALL':'Híbrida'}};
+    const name = map[x.strategy] || x.strategy;
+    
+    return `<div class="flex justify-between items-center p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+        <div>
+            <div class="font-mono font-bold text-xs text-slate-200">${{name}}</div>
+            <div class="text-[10px] text-slate-500 font-mono mt-1">${{total}} trades | µ $${{f(x.avg_pnl)}}</div>
+        </div>
+        <div class="text-right">
+            <div class="font-mono font-bold text-sm ${{pnl>=0?'text-pos':'text-neg'}}">${{pnl>=0?'+':''}}$${{f(pnl)}}</div>
+            <div class="font-mono text-[10px] font-bold ${{wrColor}}">${{wr}}% WR</div>
+        </div>
     </div>`;
-  }}).join('');
-}})();
-
-// Improvement Requests
-(()=>{{
-  const el=document.getElementById('improvBox'), items=D.improvement_requests||[];
-  if(!items.length){{
-    el.innerHTML='<div class="empty"><div class="empty-icon">✅</div><p>Sin solicitudes de mejora pendientes.<br><small>El bot analizará su estado y te notificará aquí.</small></p></div>';
-    return;
-  }}
-  const catIcon = {{'CONFIG':'⚙️','FEATURE':'🚀','STRATEGY_INSIGHT':'🧠','DATA_ISSUE':'📡'}};
-  el.innerHTML = items.map(x=>{{
-    const icon = catIcon[x.category]||'💡';
-    return `<div class="imp-item imp-${{x.priority}}">
-      <div class="imp-header">
-        <span class="imp-priority p${{x.priority}}">${{x.priority}}</span>
-        <span class="imp-cat">${{icon}} ${{x.category}}</span>
-        <span style="margin-left:auto;font-size:9px;color:var(--muted)">${{fd(x.timestamp).split(',')[0]}}</span>
-      </div>
-      <div class="imp-title">${{x.title}}</div>
-      <div class="imp-desc">${{x.description}}</div>
-    </div>`;
-  }}).join('');
-}})();
-
-// Monthly Metrics
-(()=>{{
-  const tbody=document.getElementById('monthlyTbody'), m=D.monthly_metrics||[];
-  if(!m.length){{
-    tbody.innerHTML='<tr><td colspan="7"><div class="empty" style="padding:20px">Datos disponibles al cierre del primer mes de operativa.</div></td></tr>';
-    return;
-  }}
-  tbody.innerHTML = m.map(x=>{{
-    const wr=parseFloat(x.win_rate)||0, pnl=parseFloat(x.total_pnl)||0;
-    const wrColor=wr>=50?'var(--green)':wr>=35?'var(--gold)':'var(--red)';
-    const pnlColor=pnl>=0?'var(--green)':'var(--red)';
-    return `<tr>
-      <td class="tm" style="color:var(--cyan)">${{x.month}}</td>
-      <td class="tm">${{x.total_trades||0}}</td>
-      <td class="tm" style="color:${{wrColor}}">${{wr.toFixed(1)}}%</td>
-      <td class="tm" style="color:${{pnlColor}}">${{pnl>=0?'+':''}}$${{f(pnl)}}</td>
-      <td class="tm" style="color:var(--red)">${{f(x.max_drawdown,1)}}%</td>
-      <td class="tm" style="color:var(--green)">${{x.best_pair||'—'}}</td>
-      <td class="tm" style="color:var(--red)">${{x.worst_pair||'—'}}</td>
-    </tr>`;
   }}).join('');
 }})();
 </script>
