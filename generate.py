@@ -429,22 +429,6 @@ footer span{{color:var(--cyan)}}
     <div class="pb" id="marketMonitor"></div>
   </div>
   <div class="panel">
-    <div class="ph"><span>🌍</span><span class="phtitle">Inteligencia Macro</span><span class="phsub">Global Context</span></div>
-    <div class="pb" id="macroBox"></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🧠</span><span class="phtitle">Memoria de Corto Plazo</span><span class="phsub">IA Reasoning Log</span></div>
-    <div class="pb"><div id="brainFeed"></div></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>💡</span><span class="phtitle">Peticiones de la IA</span><span class="phsub">Autonomous Requests</span></div>
-    <div class="pb"><div id="wishFeed"></div></div>
-  </div>
-  <div class="panel">
-    <div class="ph"><span>🎯</span><span class="phtitle">Análisis de Feedback</span><span class="phsub">Post-Mortem Engine</span></div>
-    <div class="pb"><div id="lessonFeed"></div></div>
-  </div>
-  <div class="panel">
     <div class="ph"><span>🔬</span><span class="phtitle">Rendimiento por Estrategia</span><span class="phsub">Últimos 30 días</span></div>
     <div class="pb" id="stratBox"></div>
   </div>
@@ -550,7 +534,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 // Market Monitor
 (()=>{{
   const el=document.getElementById('marketMonitor'), m=D.market_monitor||[];
-  if(!m.length){{el.innerHTML='<div class="empty">Sincronizando mercado...</div>';return;}}
+  if(!m.length){{el.innerHTML='<div class="empty"><div class="empty-icon">🔎</div><p>Sincronizando mercado...</p></div>';return;}}
   el.innerHTML = m.map(x => {{
     const sColor = x.score >= 5 ? 'var(--green)' : x.score >= 3 ? 'var(--gold)' : 'var(--muted)';
     const sentIcon = x.sentiment > 0.1 ? '📈' : x.sentiment < -0.1 ? '📉' : '➖';
@@ -592,7 +576,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 // Bot Brain History
 (()=>{{
   const el=document.getElementById('brainFeed'), m=D.bot_memory||[];
-  if(!m.length){{el.innerHTML='<div class="empty">La IA aún no ha generado reflexiones...</div>';return;}}
+  if(!m.length){{el.innerHTML='<div class="empty"><div class="empty-icon">💭</div><p>La IA aún no ha generado reflexiones...</p></div>';return;}}
   el.innerHTML = m.slice(0, 8).map(x => `
     <div class="brain-item">
       <div class="brain-cat">${{x.category}}</div>
@@ -606,7 +590,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 // Bot Wishes
 (()=>{{
   const el=document.getElementById('wishFeed'), w=D.bot_wishes||[];
-  if(!w.length){{el.innerHTML='<div class="empty">No hay peticiones pendientes.</div>';return;}}
+  if(!w.length){{el.innerHTML='<div class="empty"><div class="empty-icon">💡</div><p>No hay peticiones pendientes.</p></div>';return;}}
   el.innerHTML = w.map(x => `
     <div class="wish-item">
       <div class="wish-icon">${{x.status === 'ACTION' ? '⚡' : '💡'}}</div>
@@ -618,7 +602,7 @@ document.getElementById('lastUpdate').innerText = fd(D.last_updated);
 // Activity Logs
 (()=>{{
   const el=document.getElementById('logBox'), logs=D.system_logs||[];
-  if(!logs.length){{el.innerHTML='<div class="empty">Esperando registros...</div>';return;}}
+  if(!logs.length){{el.innerHTML='<div class="empty"><div class="empty-icon">📠</div><p>Esperando registros...</p></div>';return;}}
   el.innerHTML = logs.map(l => `
     <div class="log-line">
       <div class="log-ts">${{fd(l.timestamp).split(',')[1]}}</div>
