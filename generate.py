@@ -247,23 +247,23 @@ def build_html(data_json: str, data: dict) -> str:
   </div>
 
   <!-- SECONDARY ROW -->
-  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-start">
     <!-- MARKET MONITOR -->
     <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.5s;">
       <div class="panel-header"><span class="text-base">🔎</span><h2 class="panel-title">Radar Mercado</h2></div>
-      <div class="panel-body p-3 flex-1 custom-scroll overflow-y-auto max-h-[300px] space-y-2" id="marketMonitor"></div>
+      <div class="panel-body p-3 h-[300px] custom-scroll overflow-y-auto space-y-2" id="marketMonitor"></div>
     </div>
     
     <!-- MACRO -->
     <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.6s;">
       <div class="panel-header"><span class="text-base">🌍</span><h2 class="panel-title">Macro Contexto</h2></div>
-      <div class="panel-body flex-1 flex flex-col justify-around" id="macroBox"></div>
+      <div class="panel-body h-[300px] flex flex-col justify-start space-y-3" id="macroBox"></div>
     </div>
 
     <!-- STRATEGY PERF -->
     <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.7s;">
       <div class="panel-header"><span class="text-base">🔬</span><h2 class="panel-title">Estrategias</h2></div>
-      <div class="panel-body p-0 custom-scroll overflow-y-auto max-h-[300px]" id="stratBox"></div>
+      <div class="panel-body p-0 h-[300px] custom-scroll overflow-y-auto" id="stratBox"></div>
     </div>
     
     <!-- SYSTEM LOGS -->
@@ -271,7 +271,7 @@ def build_html(data_json: str, data: dict) -> str:
       <div class="panel-header bg-black/40 border-b border-accent/20">
         <span class="text-base">💻</span><h2 class="panel-title text-accent">Syslog_Term</h2>
       </div>
-      <div class="p-3 bg-black/50 font-mono text-[10px] text-slate-300 flex-1 custom-scroll overflow-y-auto space-y-1" id="logBox"></div>
+      <div class="p-3 bg-black/50 font-mono text-[10px] text-slate-300 h-[300px] custom-scroll overflow-y-auto space-y-1 block" id="logBox"></div>
     </div>
   </div>
 
