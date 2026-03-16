@@ -261,9 +261,32 @@ def build_html(data_json: str, data: dict) -> str:
     </div>
 
     <!-- STRATEGY PERF -->
-    <div class="glass-panel lg:col-span-2 flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.8s;">
-      <div class="panel-header"><span class="text-base">🔬</span><h2 class="panel-title">Rendimiento por Estrategia</h2></div>
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.7s;">
+      <div class="panel-header"><span class="text-base">🔬</span><h2 class="panel-title">Estrategias</h2></div>
       <div class="panel-body p-0 custom-scroll overflow-y-auto max-h-[300px]" id="stratBox"></div>
+    </div>
+    
+    <!-- SYSTEM LOGS -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.8s;">
+      <div class="panel-header bg-black/40 border-b border-accent/20">
+        <span class="text-base">💻</span><h2 class="panel-title text-accent">Syslog_Term</h2>
+      </div>
+      <div class="p-3 bg-black/50 font-mono text-[10px] text-slate-300 flex-1 custom-scroll overflow-y-auto space-y-1" id="logBox"></div>
+    </div>
+  </div>
+
+  <!-- TERTIARY ROW -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <!-- AUTONOMOUS ACTIONS (WISHFEED) -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 0.9s;">
+      <div class="panel-header"><span class="text-base">⚡</span><h2 class="panel-title">Acciones Autónomas</h2></div>
+      <div class="panel-body p-0 custom-scroll overflow-y-auto max-h-[250px]" id="wishFeed"></div>
+    </div>
+
+    <!-- POST-MORTEM (LESSONFEED) -->
+    <div class="glass-panel flex flex-col animate__animated animate__fadeInUp" style="animation-delay: 1.0s;">
+      <div class="panel-header"><span class="text-base">🎯</span><h2 class="panel-title">Post-Mortem Engine</h2></div>
+      <div class="panel-body p-0 custom-scroll overflow-y-auto max-h-[250px]" id="lessonFeed"></div>
     </div>
   </div>
 
@@ -464,6 +487,52 @@ Chart.defaults.font.family = "'JetBrains Mono', monospace";
         </div>
     </div>`;
   }}).join('');
+}})();
+
+// Terminal Logs
+(()=>{{
+  const el = document.getElementById('logBox'), logs = D.system_logs||[];
+  if(!logs.length) return;
+  el.innerHTML = logs.map(l => {{
+    const color = l.level==='INFO'?'text-accent':l.level==='WARNING'?'text-warn':'text-neg';
+    return `<div class="flex gap-2 hover:bg-white/5 px-2 py-1 rounded">
+        <span class="text-slate-500 shrink-0">${{fd(l.timestamp).split(', ')[1] || fd(l.timestamp).split(' ')[1]}}</span>
+        <span class="${{color}} font-bold shrink-0">[${{l.level}}]</span>
+        <span class="break-words">${{l.message}}</span>
+    </div>`;
+  }}).join('');
+  el.scrollTop = 0;
+}})();
+
+// Autonomous Actions (Bot Wishes)
+(()=>{{
+  const el = document.getElementById('wishFeed'), w = D.bot_wishes||[];
+  if(!w.length) {{ el.innerHTML = '<div class="p-6 text-center text-slate-500">Sin acciones pendientes</div>'; return; }}
+  el.innerHTML = w.map(x => `
+    <div class="flex items-start gap-3 p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+      <div class="text-sm mt-0.5">${{x.status === 'ACTION' ? '⚡' : '💡'}}</div>
+      <div>
+        <div class="text-[11px] text-accent font-medium leading-relaxed">${{x.wish}}</div>
+        <div class="text-[9px] font-mono text-slate-500 mt-1">${{fd(x.timestamp)}}</div>
+      </div>
+    </div>
+  `).join('');
+}})();
+
+// Post-Mortem Engine (Lessons)
+(()=>{{
+  const el = document.getElementById('lessonFeed'), t = D.trades||[];
+  const lessons = t.filter(x => x.lesson);
+  if(!lessons.length) {{ el.innerHTML = '<div class="p-6 text-center text-slate-500 line-clamp-2">Esperando datos<br>para post-mortem...</div>'; return; }}
+  el.innerHTML = lessons.slice(0, 5).map(x => `
+    <div class="p-4 border-b border-white/5 hover:bg-white/5 transition-colors">
+      <div class="flex justify-between items-center mb-2">
+        <span class="font-mono text-[9px] text-slate-400">${{x.pair}} | ${{fd(x.open_time)}}</span>
+        <span class="font-mono text-[10px] font-bold text-warn">${{f(x.performance_score,1)}}/10</span>
+      </div>
+      <p class="text-[10px] text-slate-300 leading-relaxed italic border-l-2 border-white/10 pl-2">"${{x.lesson}}"</p>
+    </div>
+  `).join('');
 }})();
 </script>
 </body></html>"""
