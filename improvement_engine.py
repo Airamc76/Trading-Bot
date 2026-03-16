@@ -95,84 +95,7 @@ def _check_telegram():
 
 # ── Análisis de rendimiento ───────────────────────────────────────────────────
 
-def _analyze_win_rate(d):
-    """Detecta problemas sistémicos de win rate y propone soluciones."""
-    recent = d.query(
-        "SELECT status, close_reason, pnl_pct FROM paper_trades "
-        "WHERE status != 'OPEN' ORDER BY id DESC LIMIT 30"
-    )
-    if len(recent) < 10:
-        return
 
-    total    = len(recent)
-    wins     = sum(1 for t in recent if t["status"] == "WIN")
-    win_rate = wins / total * 100
-    sl_hits  = sum(1 for t in recent if t.get("close_reason") == "SL_HIT")
-    sl_pct   = sl_hits / total * 100
-
-    if sl_pct > 65 and not _was_requested_recently("Stop Loss activados"):
-        _save_request(
-            "STRATEGY_INSIGHT", "HIGH",
-            f"Alta tasa de SL activados ({sl_pct:.0f}%) — Revisar lógica de entrada",
-            f"{sl_pct:.0f}% de trades terminan con Stop Loss tocado. "
-            "Las entradas están en zonas de ruido de mercado. "
-            "Acciones recomendadas: "
-            "(1) Sube MIN_SCORE_TO_TRADE a 7.0 en bot_config (DB), "
-            "(2) Activa solo B_EMA_PULLBACK (más conservador), "
-            "(3) Revisa el panel de Estrategias para ver cuál falla más."
-        )
-
-    if win_rate < 35 and total >= 15 and not _was_requested_recently("Win Rate Crítico"):
-        _save_request(
-            "STRATEGY_INSIGHT", "HIGH",
-            f"Win Rate Crítico ({win_rate:.0f}%) — Revisión de estrategia urgente",
-            f"Solo {win_rate:.0f}% de {total} trades son ganadores. "
-            "Necesitas al menos 40% WR con R:R 2:1 para ser rentable. "
-            "Pasos: (1) Revisa qué pares tienen peor rendimiento y elimínalos de config.py, "
-            "(2) Cambia ACTIVE_STRATEGY=B_EMA_PULLBACK en bot_config, "
-            "(3) Sube MIN_SCORE_TO_TRADE=7.5 manualmente."
-        )
-
-
-def _analyze_balance_health(d):
-    """Analiza la salud del balance y sugiere acciones correctivas o de escalado."""
-    bal_rows = d.query("SELECT balance FROM portfolio ORDER BY id DESC LIMIT 5")
-    if len(bal_rows) < 3:
-        return
-
-    current  = _safe_float(bal_rows[0]["balance"])
-    drawdown = (10000.0 - current) / 10000.0 * 100
-
-    if drawdown > 15 and not _was_requested_recently("Drawdown Elevado"):
-        _save_request(
-            "STRATEGY_INSIGHT", "HIGH",
-            f"Drawdown Elevado ({drawdown:.1f}%) — Requiere intervención",
-            f"Balance: ${current:,.2f} (pérdida del {drawdown:.1f}% desde $10,000). "
-            "Opciones: "
-            "(1) Reset limpio: ejecuta reset_bot.py (reinicia con $10,000 y memoria en blanco), "
-            "(2) Pausa manual: establece ACTIVE_STRATEGY=PAUSE_ALL en bot_config, "
-            "(3) Reduce riesgo: cambia RISK_PER_TRADE=0.01 en config.py y reinicia el bot."
-        )
-
-    # Sugerir modo señal cuando el rendimiento es sólido
-    total_row = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status != 'OPEN'")
-    total = int(total_row[0].get("c") or 0) if total_row else 0
-    
-    wins_row = d.query("SELECT COUNT(*) as c FROM paper_trades WHERE status = 'WIN'")
-    wins = int(wins_row[0].get("c") or 0) if wins_row else 0
-    
-    if total >= 30 and wins > 0:
-        wr = wins / total * 100
-        if wr >= 48 and drawdown < 3 and not _was_requested_recently("Modo Señal"):
-            _save_request(
-                "FEATURE", "LOW",
-                f"Rendimiento Sólido ({wr:.0f}% WR) — ¿Activar Modo Señal Manual?",
-                f"Con {wr:.0f}% WR en {total} trades y balance saludable, "
-                "el bot puede operar en modo señal: te avisa por Telegram "
-                "sin ejecutar trades automáticamente. Tú decides cuáles tomar. "
-                "Activa con: SIGNAL_ONLY_MODE=true en bot_config (tabla de DB). "
-                "Desactiva con: SIGNAL_ONLY_MODE=false para volver al modo autónomo."
-            )
 
 
 def _check_data_freshness(d):
@@ -222,8 +145,6 @@ def run_improvement_engine():
         d = db()
         _check_llm_availability()
         _check_telegram()
-        _analyze_win_rate(d)
-        _analyze_balance_health(d)
         _check_data_freshness(d)
         _suggest_multi_timeframe()
         logger.debug("💡 Motor de mejora ejecutado correctamente")
