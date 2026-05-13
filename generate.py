@@ -210,7 +210,7 @@ def build_html(data_json: str, data: dict) -> str:
           </div>
           <div class="bg-white/5 rounded-lg p-3 border border-white/5 hover:bg-white/10 transition-colors">
             <div class="text-[9px] font-mono text-slate-500 mb-1 tracking-wider uppercase">Hurst / Coint-p</div>
-            <div class="font-mono text-xs font-bold text-neg">H&lt;{ config.get('hurst_thresh', '0.45') } | p={ float(config.get('coint_pvalue', '0.99')):.3f }</div>
+            <div class="font-mono text-xs font-bold text-neg">H&lt;{ config.get('hurst_thresh', '0.45') } | p={ float(config.get('coint_pvalue', '0.99')):.3f}</div>
           </div>
         </div>
       </div>
