@@ -26,7 +26,8 @@ ATR_MIN   = 0.8   # Mínimo Stop Loss ATR
 ATR_MAX   = 3.0   # Máximo Stop Loss ATR (previene el bug de 87x que existía)
 ATR_DEFAULT = 1.2
 
-STRATEGIES = ["B_EMA_PULLBACK", "R_RSI_EXTREME", "M_MACD_MOMENTUM"]
+STRATEGIES = ["ZSCORE_MEAN_REVERSION"]
+ZSCORE_STRATEGY = "ZSCORE_MEAN_REVERSION"
 COOLDOWN_HOURS = 1  # No repetir un mismo tipo de pensamiento en N horas
 
 
@@ -152,9 +153,10 @@ def _analyze_win_rate_and_strategy(d) -> dict:
         ratio = avg_win / abs(avg_loss) if avg_loss != 0 else 0
         _record_thought(
             "WIN_RATE_CRITICAL",
-            f"Win rate: {win_rate:.1f}% en {total} trades. Ganancia media: ${avg_win:.2f}, "
-            f"pérdida media: ${avg_loss:.2f}. Ratio recompensa/riesgo real: {ratio:.2f}x. "
-            f"La estrategia EMA pullback no está funcionando en el régimen de mercado actual.",
+            f"Win rate: {win_rate:.1f}% en {total} trades del spread BTC/ETH. "
+            f"Ganancia media: ${avg_win:.2f}, pérdida media: ${avg_loss:.2f}. "
+            f"Ratio recompensa/riesgo real: {ratio:.2f}x. "
+            f"El Z-Score puede estar teniendo falsos positivos — revisar cointegración y Hurst.",
             "NEGATIVE"
         )
 
@@ -181,51 +183,35 @@ def _analyze_win_rate_and_strategy(d) -> dict:
 
 def _analyze_atr_and_stop_loss(d, win_rate: float):
     """
-    Ajusta el Stop Loss ATR de forma inteligente, con cap duro.
-    Corrige el bug anterior donde el ATR crecía indefinidamente.
+    Con Z-Score Mean Reversion, el SL se define por el umbral ZSCORE_STOP (3.5σ).
+    Este módulo ajusta MIN_SCORE_TO_TRADE en función del win rate para ser
+    más selectivo cuando el rendimiento es bajo.
     """
-    current_atr = _safe_float(get_bot_config("STOP_LOSS_ATR", ATR_DEFAULT))
-
-    # ── Fix crítico: reset si el ATR está fuera de rango ──────────────────
-    if current_atr > ATR_MAX or current_atr < ATR_MIN:
-        set_bot_config("STOP_LOSS_ATR", str(ATR_DEFAULT))
-        _record_thought(
-            "ATR_RESET",
-            f"Detecto que el Stop Loss ATR estaba en {current_atr:.2f}x — fuera del rango "
-            f"saludable [{ATR_MIN}-{ATR_MAX}]. Lo reseteo a {ATR_DEFAULT}x para operar con parámetros normales.",
-            "NEGATIVE"
-        )
-        _record_action(f"Reset de Stop Loss ATR: {current_atr:.2f}x → {ATR_DEFAULT}x (límite máximo: {ATR_MAX}x).")
-        current_atr = ATR_DEFAULT
-
-    # ── Ajuste basado en win rate, solo si no hemos ajustado recientemente ──
-    if _was_thought_recently("ATR_ADJUSTMENT", hours=3):
+    if _was_thought_recently("SCORE_ADJUSTMENT", hours=3):
         return
 
-    if win_rate < 35:
-        # Ampliar SL ligeramente para darle más espacio al precio
-        new_atr = round(min(current_atr * 1.15, ATR_MAX), 2)
-        if new_atr != current_atr:
-            set_bot_config("STOP_LOSS_ATR", str(new_atr))
-            _record_thought(
-                "ATR_ADJUSTMENT",
-                f"Win rate actual: {win_rate:.1f}%. El precio toca mi Stop Loss y luego va a mi favor. "
-                f"Ampliando SL de {current_atr}x a {new_atr}x ATR para dar más espacio al movimiento.",
-                "NEUTRAL"
-            )
-            _record_action(f"SL ajustado de {current_atr}x a {new_atr}x ATR. No superará {ATR_MAX}x.")
+    current_min = _safe_float(get_bot_config("MIN_SCORE_TO_TRADE", 5.0))
 
-    elif win_rate > 60 and current_atr > ATR_DEFAULT:
-        # Cuando va bien, volvemos al default gradualmente
-        new_atr = round(max(current_atr * 0.95, ATR_DEFAULT), 2)
-        if new_atr != current_atr:
-            set_bot_config("STOP_LOSS_ATR", str(new_atr))
-            _record_thought(
-                "ATR_ADJUSTMENT",
-                f"Win rate: {win_rate:.1f}%. Con mejor rendimiento, normalizo el SL de "
-                f"{current_atr}x hacia {new_atr}x ATR. Manteniendo riesgo controlado.",
-                "POSITIVE"
-            )
+    if win_rate < 35 and current_min < 7.0:
+        new_min = round(min(current_min + 0.5, 7.5), 1)
+        set_bot_config("MIN_SCORE_TO_TRADE", str(new_min))
+        _record_thought(
+            "SCORE_ADJUSTMENT",
+            f"Win rate del spread: {win_rate:.1f}%. Subiendo umbral de score "
+            f"de {current_min} a {new_min}/10 para exigir más confluencia Z-Score.",
+            "NEUTRAL"
+        )
+        _record_action(f"Score mínimo ajustado: {current_min} → {new_min}/10 (win rate bajo: {win_rate:.0f}%)")
+
+    elif win_rate > 60 and current_min > 5.5:
+        new_min = round(max(current_min - 0.5, 5.0), 1)
+        set_bot_config("MIN_SCORE_TO_TRADE", str(new_min))
+        _record_thought(
+            "SCORE_ADJUSTMENT",
+            f"Win rate del spread: {win_rate:.1f}%. Normalizando score mínimo "
+            f"de {current_min} a {new_min}/10.",
+            "POSITIVE"
+        )
 
 
 def _analyze_pair_performance(d):
@@ -408,16 +394,25 @@ def _analyze_strategy_performance(d):
     best_wr = int(best["wins"]) / int(best["total"]) * 100
     best_pnl = _safe_float(best["total_pnl"])
 
-    # Si hay una estrategia claramente mejor, priorizarla
-    current_strategy = get_bot_config("ACTIVE_STRATEGY", "B_EMA_PULLBACK")
+    # Proteger la estrategia Z-Score — no revertir a estrategias antiguas
+    current_strategy = get_bot_config("ACTIVE_STRATEGY", ZSCORE_STRATEGY)
+    if current_strategy == ZSCORE_STRATEGY:
+        # Con Z-Score solo hay un "par" (el spread) — registrar rendimiento
+        if best_wr > 55 and best_pnl > 0 and not _was_thought_recently("STRATEGY_PERF", hours=6):
+            _record_thought(
+                "STRATEGY_PERF",
+                f"Z-Score Mean Reversion rinde bien: {best_wr:.0f}% WR, "
+                f"${best_pnl:.2f} P&L en {best['total']} trades del spread BTC/ETH.",
+                "POSITIVE"
+            )
+        return
 
     if best["strategy"] != current_strategy and best_wr > 55 and best_pnl > 0:
         set_bot_config("ACTIVE_STRATEGY", best["strategy"])
         _record_thought(
             "STRATEGY_SWITCH",
             f"Cambio de estrategia: '{best['strategy']}' supera a '{current_strategy}' "
-            f"({best_wr:.0f}% WR, ${best_pnl:.2f} P&L en {best['total']} trades). "
-            f"Priorizaré señales de la estrategia más rentable en el contexto actual.",
+            f"({best_wr:.0f}% WR, ${best_pnl:.2f} P&L en {best['total']} trades).",
             "POSITIVE"
         )
         _record_action(
@@ -531,12 +526,6 @@ def _defensive_decay(d):
                 decay_msg += f"Reduciendo score min: {current_min} -> {new_min}. "
                 changed = True
             
-            if current_atr > 1.5:
-                new_atr = max(current_atr - 0.2, 1.5)
-                set_bot_config("STOP_LOSS_ATR", str(round(new_atr, 1)))
-                decay_msg += f"Normalizando SL ATR: {current_atr} -> {new_atr}. "
-                changed = True
-                
             if changed:
                 _record_thought("DEFENSIVE_DECAY", decay_msg, "NEUTRAL")
                 _record_action(decay_msg)

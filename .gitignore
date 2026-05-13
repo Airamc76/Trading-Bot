@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Entorno local
+.env
+*.env
+
+# Logs
+logs/
+*.log
+
+# Archivos temporales
+*.tmp
+push_error.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
