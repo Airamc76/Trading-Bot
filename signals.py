@@ -1,16 +1,23 @@
 """
-signals.py — Motor Multi-Estrategia
+signals.py — Z-Score Mean Reversion Strategy — BTC/ETH Spread
 
-Tres estrategias independientes evaluadas por par:
-  B_EMA_PULLBACK  — Pullback a EMA en tendencia (original, mejorada)
-  R_RSI_EXTREME   — Rebote/rechazo desde extremos de RSI con confirmación
-  M_MACD_MOMENTUM — Cruce de histograma MACD con volumen
+Lógica matemática:
+  spread  = log(ETH) - β × log(BTC)        β via OLS rolling (ventana 500)
+  z_score = (spread - μ) / σ               μ/σ via rolling window 60
 
-El cerebro (brain.py) puede activar/desactivar estrategias según rendimiento.
-El score final refleja qué tan alineados están todos los factores.
+  Z < -2  → ETH barato relativo a BTC → LONG spread  (BUY  ETH + SHORT BTC)
+  Z > +2  → ETH caro  relativo a BTC → SHORT spread (SELL ETH + LONG  BTC)
+  |Z| < 0.5 → cerrar posición (reversión completada)
+  |Z| > 3.5 → stop loss
+
+Filtros obligatorios:
+  1. Cointegración (Engle-Granger p < 0.05)
+  2. Hurst Exponent (H < 0.45 → mean-reverting)
+  3. Volumen mínimo (≥ 70% del avg-20)
+  4. RSI de confirmación (< 35 para BUY, > 65 para SELL)
 """
 
-from datetime import datetime
+import numpy as np
 from database import get_bot_config
 
 
@@ -21,290 +28,211 @@ def _safe(v, default=0.0):
         return default
 
 
-# ── Strategy B: EMA Pullback ──────────────────────────────────────────────────
-
-def _strategy_B(vals: dict) -> tuple[str, list[str], float]:
+def score_zscore_signal(spread_data: dict, coint_pvalue: float,
+                        config_obj, sentiment_score: float = 0.0,
+                        macro_context: dict = None) -> dict:
     """
-    Pullback a la EMA en contexto de tendencia definida.
-    Requiere: tendencia clara en EMA200/EMA50, precio que toca EMA20 o EMA50,
-              RSI no sobrecomprado/sobrevendido en exceso.
+    Genera una señal de trading basada en Z-Score del spread BTC/ETH.
+
+    Args:
+        spread_data:    Dict con z_score, hurst, beta, mu, sigma, eth_price,
+                        btc_price, eth_rsi, eth_volume, eth_volume_avg
+        coint_pvalue:   P-value del test Engle-Granger (cacheado 24h)
+        config_obj:     Módulo config con parámetros Z-score
+        sentiment_score: Score VADER de noticias crypto (-1 a +1)
+        macro_context:  Dict con risk_appetite (HIGH/NEUTRAL/LOW)
+
+    Returns:
+        Dict con direction (BUY/SELL/NEUTRAL), score 0-10, reasons, SL, TP
     """
-    price    = _safe(vals.get("price"))
-    ema_20   = _safe(vals.get("ema_20"))
-    ema_50   = _safe(vals.get("ema_50"))
-    ema_200  = _safe(vals.get("ema_200"))
-    rsi      = _safe(vals.get("rsi"), 50)
-    macd_h   = _safe(vals.get("macd_hist"))
-    bb_lower = _safe(vals.get("bb_lower"))
-    bb_upper = _safe(vals.get("bb_upper"))
-    bb_mid   = _safe(vals.get("bb_mid"))
+    # ── Extraer datos del spread ─────────────────────────────────────────────
+    z_score        = spread_data["z_score"]
+    hurst          = spread_data["hurst"]
+    eth_rsi        = spread_data["eth_rsi"]
+    eth_volume     = spread_data["eth_volume"]
+    eth_volume_avg = spread_data["eth_volume_avg"]
+    eth_price      = spread_data["eth_price"]
+    btc_price      = spread_data["btc_price"]
+    mu             = spread_data["mu"]
+    sigma          = spread_data["sigma"]
+    beta           = spread_data["beta"]
 
-    if not all([price, ema_50, rsi]):
-        return "NEUTRAL", [], 0.0
+    # ── Obtener parámetros dinámicos (el cerebro puede ajustarlos) ───────────
+    entry_z      = _safe(get_bot_config("ZSCORE_ENTRY",      config_obj.ZSCORE_ENTRY))
+    exit_z       = _safe(get_bot_config("ZSCORE_EXIT",       config_obj.ZSCORE_EXIT))
+    stop_z       = _safe(get_bot_config("ZSCORE_STOP",       config_obj.ZSCORE_STOP))
+    hurst_thresh = _safe(get_bot_config("HURST_THRESHOLD",   config_obj.HURST_THRESHOLD))
+    vol_min_pct  = _safe(get_bot_config("VOLUME_MIN_PCT",    config_obj.VOLUME_MIN_PCT))
+    rsi_buy      = _safe(get_bot_config("RSI_CONFIRM_BUY",   config_obj.RSI_CONFIRM_BUY))
+    rsi_sell     = _safe(get_bot_config("RSI_CONFIRM_SELL",  config_obj.RSI_CONFIRM_SELL))
+    coint_max_pv = _safe(get_bot_config("COINT_MAX_PVALUE",  config_obj.COINT_MAX_PVALUE))
 
-    confluences = []
-    direction = "NEUTRAL"
+    macro_mode = macro_context.get("risk_appetite", "NEUTRAL") if macro_context else "NEUTRAL"
+    reasons    = []
 
-    # Determinar tendencia principal (usando EMA200 si disponible, sino EMA50)
-    if ema_200 and ema_200 > 0:
-        trend_up = price > ema_200 and ema_50 > ema_200
-        trend_dn = price < ema_200 and ema_50 < ema_200
+    # ── FILTRO 0: Cointegración ──────────────────────────────────────────────
+    if coint_pvalue > coint_max_pv:
+        return _neutral(
+            f"Par no cointegrado — p-value={coint_pvalue:.3f} > {coint_max_pv} "
+            "(pausa obligatoria)", sentiment_score, score=0.0
+        )
+    reasons.append(f"Cointegración BTC/ETH confirmada (p={coint_pvalue:.4f})")
+
+    # ── FILTRO 1: Hurst Exponent ─────────────────────────────────────────────
+    if hurst >= hurst_thresh:
+        return _neutral(
+            f"Régimen trending — Hurst={hurst:.3f} ≥ {hurst_thresh} "
+            "(requiere mercado mean-reverting)", sentiment_score, score=1.0
+        )
+    reasons.append(f"Régimen mean-reverting confirmado (H={hurst:.3f} < {hurst_thresh})")
+
+    # ── FILTRO 2: Volumen mínimo ─────────────────────────────────────────────
+    vol_ratio = eth_volume / eth_volume_avg if eth_volume_avg > 0 else 0.0
+    if vol_ratio < vol_min_pct:
+        return _neutral(
+            f"Volumen ETH insuficiente ({vol_ratio:.0%} del avg-20 — mín {vol_min_pct:.0%})",
+            sentiment_score, score=2.0
+        )
+    reasons.append(f"Volumen OK — {vol_ratio:.0%} del promedio de 20 períodos")
+
+    # ── SEÑAL PRINCIPAL: Z-Score ─────────────────────────────────────────────
+    if z_score <= -entry_z:
+        direction = "BUY"   # ETH barato vs BTC → LONG spread
+        reasons.append(
+            f"Z-Score bajista extremo: {z_score:.2f} ≤ -{entry_z:.1f}σ "
+            "— ETH barato relativo a BTC"
+        )
+    elif z_score >= entry_z:
+        direction = "SELL"  # ETH caro vs BTC → SHORT spread
+        reasons.append(
+            f"Z-Score alcista extremo: {z_score:.2f} ≥ +{entry_z:.1f}σ "
+            "— ETH caro relativo a BTC"
+        )
     else:
-        trend_up = price > ema_50 and (ema_20 > ema_50 if ema_20 else True)
-        trend_dn = price < ema_50 and (ema_20 < ema_50 if ema_20 else True)
+        return _neutral(
+            f"Z-Score en rango neutro: {z_score:.2f} (umbral ±{entry_z:.1f}σ)",
+            sentiment_score, score=3.0
+        )
 
-    # Zona de pullback: precio tocando EMA20 o EMA50 (dentro de 0.3%)
-    near_ema20 = ema_20 > 0 and abs(price - ema_20) / price < 0.003
-    near_ema50 = ema_50 > 0 and abs(price - ema_50) / price < 0.004
-
-    if trend_up and (near_ema20 or near_ema50):
-        if 25 < rsi < 55:  # RSI vendido o neutro, no sobrecomprado
-            direction = "BUY"
-            confluences.append(f"B: Pullback a {'EMA20' if near_ema20 else 'EMA50'} en tendencia alcista")
-            if ema_200 and price > ema_200:
-                confluences.append("B: EMA200 confirma tendencia alcista mayor")
-            if macd_h > 0:
-                confluences.append("B: MACD apoya el impulso alcista")
-            if bb_lower and price < bb_mid:
-                confluences.append("B: Precio en zona baja de Bollinger — soporte potencial")
-
-    elif trend_dn and (near_ema20 or near_ema50):
-        if 45 < rsi < 75:  # RSI comprado o neutro, no sobrevendido
-            direction = "SELL"
-            confluences.append(f"B: Pullback a {'EMA20' if near_ema20 else 'EMA50'} en tendencia bajista")
-            if ema_200 and price < ema_200:
-                confluences.append("B: EMA200 confirma tendencia bajista mayor")
-            if macd_h < 0:
-                confluences.append("B: MACD apoya el impulso bajista")
-            if bb_upper and price > bb_mid:
-                confluences.append("B: Precio en zona alta de Bollinger — resistencia potencial")
-
-    quality = len(confluences) / 4.0  # 4 máx confluencias
-    return direction, confluences, quality
-
-
-# ── Strategy R: RSI Extreme Reversal ─────────────────────────────────────────
-
-def _strategy_R(vals: dict) -> tuple[str, list[str], float]:
-    """
-    Rebote desde extremos de RSI con confirmación de precio.
-    RSI < 30 → posible rebote alcista / RSI > 70 → posible rechazo bajista.
-    Requiere confirmación adicional (Bollinger Bands + MACD).
-    """
-    price    = _safe(vals.get("price"))
-    rsi      = _safe(vals.get("rsi"), 50)
-    macd_h   = _safe(vals.get("macd_hist"))
-    bb_lower = _safe(vals.get("bb_lower"))
-    bb_upper = _safe(vals.get("bb_upper"))
-    ema_50   = _safe(vals.get("ema_50"))
-
-    if not all([price, rsi]):
-        return "NEUTRAL", [], 0.0
-
-    confluences = []
-    direction = "NEUTRAL"
-
-    # RSI sobrevendido → buscar rebote alcista
-    if rsi < 28:
-        direction = "BUY"
-        confluences.append(f"R: RSI sobrevendido ({rsi:.1f}) — potencial rebote")
-        if bb_lower and price <= bb_lower * 1.002:
-            confluences.append("R: Precio en o debajo de Bollinger inferior — soporte estadístico")
-        if macd_h > 0 or macd_h > -0.0001:  # MACD virando o positivo
-            confluences.append("R: MACD virando positivo — confirmación de momentum")
-        if ema_50 and price > ema_50 * 0.98:  # No demasiado lejos de EMA50
-            confluences.append("R: Precio cerca de soporte EMA50")
-
-    # RSI sobrecomprado → buscar rechazo bajista
-    elif rsi > 72:
-        direction = "SELL"
-        confluences.append(f"R: RSI sobrecomprado ({rsi:.1f}) — potencial rechazo")
-        if bb_upper and price >= bb_upper * 0.998:
-            confluences.append("R: Precio en o encima de Bollinger superior — resistencia estadística")
-        if macd_h < 0 or macd_h < 0.0001:  # MACD virando o negativo
-            confluences.append("R: MACD virando negativo — confirmación de debilidad")
-        if ema_50 and price < ema_50 * 1.02:
-            confluences.append("R: Precio cerca de resistencia EMA50")
-
-    quality = len(confluences) / 4.0
-    return direction, confluences, quality
-
-
-# ── Strategy M: MACD Momentum ─────────────────────────────────────────────────
-
-def _strategy_M(vals: dict) -> tuple[str, list[str], float]:
-    """
-    Cruce de histograma MACD con confirmación de tendencia y volumen.
-    Busca el cambio de signo del histograma con el precio bien posicionado.
-    """
-    price   = _safe(vals.get("price"))
-    macd    = _safe(vals.get("macd"))
-    macd_h  = _safe(vals.get("macd_hist"))
-    macd_s  = _safe(vals.get("macd_signal"))
-    rsi     = _safe(vals.get("rsi"), 50)
-    ema_20  = _safe(vals.get("ema_20"))
-    ema_50  = _safe(vals.get("ema_50"))
-    volume  = _safe(vals.get("volume"))
-
-    if not all([price, macd, macd_s]):
-        return "NEUTRAL", [], 0.0
-
-    confluences = []
-    direction = "NEUTRAL"
-
-    # Cruce alcista: MACD cruza por encima de señal (histograma positivo y creciendo)
-    if macd > macd_s and macd_h > 0:
-        if 35 < rsi < 65:  # RSI en zona media — momentum sin exceso
-            direction = "BUY"
-            confluences.append(f"M: MACD cruzó al alza (hist: {macd_h:.5f})")
-            if ema_20 and price > ema_20:
-                confluences.append("M: Precio sobre EMA20 confirma momentum")
-            if ema_50 and price > ema_50:
-                confluences.append("M: Precio sobre EMA50 — tendencia de fondo alcista")
-            if volume and volume > 0:
-                confluences.append("M: Volumen presente en el movimiento")
-
-    # Cruce bajista: MACD cruza por debajo de señal (histograma negativo)
-    elif macd < macd_s and macd_h < 0:
-        if 35 < rsi < 65:
-            direction = "SELL"
-            confluences.append(f"M: MACD cruzó a la baja (hist: {macd_h:.5f})")
-            if ema_20 and price < ema_20:
-                confluences.append("M: Precio bajo EMA20 confirma debilidad")
-            if ema_50 and price < ema_50:
-                confluences.append("M: Precio bajo EMA50 — tendencia de fondo bajista")
-            if volume and volume > 0:
-                confluences.append("M: Volumen en la caída")
-
-    quality = len(confluences) / 4.0
-    return direction, confluences, quality
-
-
-# ── Motor de señal integrado ─────────────────────────────────────────────────
-
-def score_signal(vals: dict, config_obj, sentiment_score: float = 0.0,
-                 macro_context: dict = None) -> dict:
-    """
-    Evalúa las 3 estrategias y construye el score final por confluencia global.
-    
-    El cerebro puede deshabilitar una estrategia escribiendo en bot_config.
-    El score final = weighted sum de estrategias activas + sentiment + macro.
-    """
-    price = _safe(vals.get("price"))
-    atr   = _safe(vals.get("atr"), 0.001)
-
-    if not price:
-        return {"direction": "NEUTRAL", "score": 0, "reasons": [{"note": "Sin datos de precio"}]}
-
-    # ── Obtener configuración dinámica del cerebro ───────────────────────────
-    dyn_sl_atr = _safe(get_bot_config("STOP_LOSS_ATR", config_obj.STOP_LOSS_ATR))
-    # Aplicar límites de seguridad siempre
-    dyn_sl_atr = max(0.8, min(dyn_sl_atr, 3.0))
-
-    dyn_tp_r   = _safe(get_bot_config("TAKE_PROFIT_R", config_obj.TAKE_PROFIT_R))
-    dyn_tp_r   = max(2.0, dyn_tp_r)
-
-    active_strategy = get_bot_config("ACTIVE_STRATEGY", "ALL")
-
-    # ── Evaluar cada estrategia ──────────────────────────────────────────────
-    b_dir, b_conf, b_qual = _strategy_B(vals)
-    r_dir, r_conf, r_qual = _strategy_R(vals)
-    m_dir, m_conf, m_qual = _strategy_M(vals)
-
-    # Filtrar por estrategia activa si el cerebro forzó una
-    if active_strategy != "ALL":
-        if active_strategy == "B_EMA_PULLBACK":
-            r_dir, r_conf, r_qual = "NEUTRAL", [], 0.0
-            m_dir, m_conf, m_qual = "NEUTRAL", [], 0.0
-        elif active_strategy == "R_RSI_EXTREME":
-            b_dir, b_conf, b_qual = "NEUTRAL", [], 0.0
-            m_dir, m_conf, m_qual = "NEUTRAL", [], 0.0
-        elif active_strategy == "M_MACD_MOMENTUM":
-            b_dir, b_conf, b_qual = "NEUTRAL", [], 0.0
-            r_dir, r_conf, r_qual = "NEUTRAL", [], 0.0
-
-    # ── Consenso de estrategias ──────────────────────────────────────────────
-    directions = [d for d in [b_dir, r_dir, m_dir] if d != "NEUTRAL"]
-    all_confluences = b_conf + r_conf + m_conf
-
-    if not directions:
-        direction = "NEUTRAL"
+    # ── FILTRO 3: RSI de confirmación ────────────────────────────────────────
+    rsi_ok = False
+    if direction == "BUY" and eth_rsi < rsi_buy:
+        rsi_ok = True
+        reasons.append(f"RSI ETH confirma sobrevendido: {eth_rsi:.1f} < {rsi_buy:.0f}")
+    elif direction == "SELL" and eth_rsi > rsi_sell:
+        rsi_ok = True
+        reasons.append(f"RSI ETH confirma sobrecomprado: {eth_rsi:.1f} > {rsi_sell:.0f}")
     else:
-        buy_count  = directions.count("BUY")
-        sell_count = directions.count("SELL")
-        # Consenso: mayoría de estrategias activas deben estar de acuerdo
-        if buy_count > sell_count:
-            direction = "BUY"
-        elif sell_count > buy_count:
-            direction = "SELL"
-        else:
-            # Empate 1-1 en direcciones contrarias → neutralizar
-            direction = "NEUTRAL"
-            all_confluences = []
+        reasons.append(
+            f"RSI ETH sin confirmar ({eth_rsi:.1f}) — señal válida pero menos convicción"
+        )
 
-    # Excluir confluencias de la dirección contraria
-    if direction == "BUY":
-        all_confluences = [c for c in all_confluences if "bajist" not in c.lower() and "baja" not in c.lower()]
-    elif direction == "SELL":
-        all_confluences = [c for c in all_confluences if "alcist" not in c.lower() and "alza" not in c.lower()]
-
-    # ── Sentimiento ──────────────────────────────────────────────────────────
-    macro_mode = "NEUTRAL"
-    if macro_context:
-        macro_mode = macro_context.get("risk_appetite", "NEUTRAL")
-
+    # ── Sentimiento y Macro ──────────────────────────────────────────────────
     if sentiment_score > 0.25 and direction == "BUY":
-        all_confluences.append(f"Sentimiento alcista ({sentiment_score:+.2f})")
+        reasons.append(f"Sentimiento crypto alcista ({sentiment_score:+.2f})")
     elif sentiment_score < -0.25 and direction == "SELL":
-        all_confluences.append(f"Sentimiento bajista ({sentiment_score:+.2f})")
+        reasons.append(f"Sentimiento crypto bajista ({sentiment_score:+.2f})")
 
     if (direction == "BUY" and macro_mode == "HIGH") or (direction == "SELL" and macro_mode == "LOW"):
-        all_confluences.append(f"Macro acompaña ({macro_mode})")
-    elif direction != "NEUTRAL" and macro_mode == "NEUTRAL":
-        all_confluences.append("Macro neutral (entrada con cautela)")
+        reasons.append(f"Macro acompaña la dirección ({macro_mode})")
+    elif macro_mode == "NEUTRAL":
+        reasons.append("Macro neutral — entrada con cautela")
 
     # ── Score final ──────────────────────────────────────────────────────────
-    # Mínimo 3 confluencias para generar señal, score máximo 10
-    if direction == "NEUTRAL" or len(all_confluences) < 3:
-        direction = "NEUTRAL"
-        final_score = float(len(all_confluences)) * 1.5  # Score parcial informativo
-    else:
-        # Base: 2 pts por confluencia, cap 10
-        base = min(len(all_confluences) * 2.0, 8.0)
-        # Bonus por consenso múltiple de estrategias
-        strategy_bonus = min((len(directions) - 1) * 1.0, 2.0)
-        final_score = min(base + strategy_bonus, 10.0)
+    z_excess        = abs(abs(z_score) - entry_z)
+    z_bonus         = min(z_excess * 0.5, 2.0)
+    rsi_bonus       = 1.5 if rsi_ok else 0.0
+    sentiment_bonus = 0.5 if any("entimiento" in r for r in reasons) else 0.0
+    macro_bonus     = 0.5 if any("Macro" in r for r in reasons) else 0.0
+    final_score     = min(5.0 + z_bonus + rsi_bonus + sentiment_bonus + macro_bonus, 10.0)
 
-    # ── SL / TP ──────────────────────────────────────────────────────────────
-    stop_loss = take_profit = None
-    if direction == "BUY":
-        stop_loss   = price - (atr * dyn_sl_atr)
-        take_profit = price + (abs(price - stop_loss) * dyn_tp_r)
-    elif direction == "SELL":
-        stop_loss   = price + (atr * dyn_sl_atr)
-        take_profit = price - (abs(price - stop_loss) * dyn_tp_r)
+    # ── SL / TP en precio de ETH (asumiendo BTC constante para referencia) ───
+    sl, tp = _calc_sl_tp(direction, z_score, entry_z, exit_z, stop_z,
+                         mu, sigma, beta, eth_price, btc_price)
 
     return {
-        "direction":   direction,
-        "score":       round(final_score, 1),
-        "reasons":     [{"note": c} for c in all_confluences] if all_confluences
-                       else [{"note": "Sin confluencias suficientes"}],
-        "stop_loss":   stop_loss,
-        "take_profit": take_profit,
-        "sentiment":   sentiment_score,
-        "macro_mode":  macro_mode,
-        "strategies_voted": {
-            "B": b_dir, "R": r_dir, "M": m_dir
-        }
+        "direction":        direction,
+        "score":            round(final_score, 1),
+        "reasons":          [{"note": r} for r in reasons],
+        "stop_loss":        sl,
+        "take_profit":      tp,
+        "sentiment":        sentiment_score,
+        "macro_mode":       macro_mode,
+        "z_score":          z_score,
+        "hurst":            hurst,
+        "beta":             beta,
+        "strategies_voted": {"ZScore": direction, "Hurst": "OK", "Coint": "OK"},
     }
 
 
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _neutral(reason: str, sentiment: float, score: float = 0.0) -> dict:
+    return {
+        "direction":        "NEUTRAL",
+        "score":            round(score, 1),
+        "reasons":          [{"note": reason}],
+        "stop_loss":        None,
+        "take_profit":      None,
+        "sentiment":        sentiment,
+        "macro_mode":       "NEUTRAL",
+        "z_score":          None,
+        "hurst":            None,
+        "beta":             None,
+        "strategies_voted": {"ZScore": "NEUTRAL", "Hurst": "—", "Coint": "—"},
+    }
+
+
+def _calc_sl_tp(direction, z_score, entry_z, exit_z, stop_z,
+                mu, sigma, beta, eth_price, btc_price):
+    """
+    Convierte los umbrales de Z-score a precios de ETH.
+    Fórmula: spread_target = μ + z_target × σ
+             log(ETH_target) = spread_target + β × log(BTC)
+             ETH_target = exp(spread_target + β × log(BTC))
+    """
+    log_btc = np.log(btc_price)
+
+    def z_to_eth(z_target):
+        spread_t = mu + z_target * sigma
+        return float(np.exp(spread_t + beta * log_btc))
+
+    try:
+        if direction == "BUY":
+            # Spread sube desde Z ≈ -2 hasta Z = -0.5 (ETH sube)
+            tp = z_to_eth(-exit_z)
+            sl = z_to_eth(-stop_z)
+            # Validación: TP > entry > SL
+            if tp <= eth_price or sl >= eth_price:
+                tp = round(eth_price * 1.04, 2)
+                sl = round(eth_price * 0.96, 2)
+        else:  # SELL
+            # Spread baja desde Z ≈ +2 hasta Z = +0.5 (ETH baja)
+            tp = z_to_eth(exit_z)
+            sl = z_to_eth(stop_z)
+            # Validación: TP < entry < SL
+            if tp >= eth_price or sl <= eth_price:
+                tp = round(eth_price * 0.96, 2)
+                sl = round(eth_price * 1.04, 2)
+    except Exception:
+        if direction == "BUY":
+            tp = round(eth_price * 1.04, 2)
+            sl = round(eth_price * 0.96, 2)
+        else:
+            tp = round(eth_price * 0.96, 2)
+            sl = round(eth_price * 1.04, 2)
+
+    return round(sl, 2), round(tp, 2)
+
+
 def format_signal_summary(pair: str, timeframe: str, signal: dict, price: float) -> str:
-    emoji = {"BUY": "🟢", "SELL": "🔴", "NEUTRAL": "⚪"}.get(signal["direction"], "⚪")
-    votes = signal.get("strategies_voted", {})
-    vote_str = f"[B:{votes.get('B','?')} R:{votes.get('R','?')} M:{votes.get('M','?')}]"
+    icon = {"BUY": "🟢", "SELL": "🔴", "NEUTRAL": "⚪"}.get(signal["direction"], "⚪")
+    z    = signal.get("z_score")
+    h    = signal.get("hurst")
+    z_str = f"Z={z:.2f}" if z is not None else "Z=?"
+    h_str = f"H={h:.3f}" if h is not None else "H=?"
     notes = " | ".join(r["note"] for r in signal["reasons"][:2])
     return (
-        f"{emoji} {pair} ({timeframe}) | Score: {signal['score']:.1f}/10 "
-        f"{vote_str} | Precio: {price:.4g} | {notes}"
+        f"{icon} {pair} ({timeframe}) | Score: {signal['score']:.1f}/10 "
+        f"[{z_str} {h_str}] | ETH: ${price:,.2f} | {notes}"
     )
