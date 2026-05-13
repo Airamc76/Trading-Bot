@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     coint_pvalue_open REAL,
     beta_open         REAL,
     macro_regime      TEXT,
-    eth_rsi_open      REAL
+    eth_rsi_open      REAL,
+    experiment_id     INTEGER
 );
 CREATE TABLE IF NOT EXISTS portfolio (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,6 +131,17 @@ CREATE TABLE IF NOT EXISTS bot_improvement_requests (
     title          TEXT,
     description    TEXT,
     status         TEXT DEFAULT 'PENDING'  -- 'PENDING', 'ACKNOWLEDGED', 'IMPLEMENTED'
+);
+CREATE TABLE IF NOT EXISTS experiments (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT UNIQUE NOT NULL,
+    description     TEXT,
+    config_json     TEXT,
+    initial_balance REAL DEFAULT 10000.0,
+    current_balance REAL DEFAULT 10000.0,
+    status          TEXT DEFAULT 'ACTIVE',  -- 'ACTIVE', 'PAUSED', 'COMPLETED'
+    created_at      TEXT DEFAULT (datetime('now')),
+    ended_at        TEXT
 );
 """
 
@@ -301,7 +313,18 @@ def migrate_database():
     except Exception as e:
         logger.warning(f"Error re-inicializando tablas: {e}")
 
-    # 3. Columnas de observabilidad en paper_trades
+    # 3. experiment_id en paper_trades
+    try:
+        existing = d.query("PRAGMA table_info(paper_trades)")
+        existing_names = {c["name"] for c in existing}
+        if "experiment_id" not in existing_names:
+            logger.info("➕ Añadiendo columna 'experiment_id' a tabla 'paper_trades'...")
+            d.execute("ALTER TABLE paper_trades ADD COLUMN experiment_id INTEGER")
+            d.commit()
+    except Exception as e:
+        logger.warning(f"Error añadiendo experiment_id: {e}")
+
+    # 4. Columnas de observabilidad en paper_trades
     new_pt_cols = [
         ("strategy_name",     "TEXT"),
         ("z_score_open",      "REAL"),
@@ -413,13 +436,14 @@ def open_paper_trade(trade: dict) -> int:
     d.execute(
         "INSERT INTO paper_trades "
         "(signal_id,pair,direction,open_time,open_price,stop_loss,take_profit,position_size,"
-        "strategy_name,z_score_open,hurst_open,coint_pvalue_open,beta_open,macro_regime,eth_rsi_open,status) "
-        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN')",
+        "strategy_name,z_score_open,hurst_open,coint_pvalue_open,beta_open,macro_regime,"
+        "eth_rsi_open,experiment_id,status) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN')",
         [trade["signal_id"], trade["pair"], trade["direction"], trade["open_time"],
          trade["open_price"], trade["stop_loss"], trade["take_profit"], trade["position_size"],
          trade.get("strategy_name"), trade.get("z_score_open"), trade.get("hurst_open"),
          trade.get("coint_pvalue_open"), trade.get("beta_open"), trade.get("macro_regime"),
-         trade.get("eth_rsi_open")]
+         trade.get("eth_rsi_open"), trade.get("experiment_id")]
     )
     d.commit()
     rows = d.query("SELECT id FROM paper_trades ORDER BY id DESC LIMIT 1")
@@ -736,4 +760,92 @@ def set_bot_config(key: str, value: str):
         [key, value, now]
     )
     d.commit()
+
+
+# ── Experiment engine API ─────────────────────────────────────────────────────
+
+def create_experiment(name: str, description: str = "", config: dict = None) -> int:
+    """Crea un nuevo slot de experimento con balance inicial de $10,000."""
+    d = db()
+    config_str = json.dumps(config or {})
+    d.execute(
+        "INSERT INTO experiments (name, description, config_json, initial_balance, current_balance) "
+        "VALUES (?, ?, ?, 10000.0, 10000.0) "
+        "ON CONFLICT(name) DO UPDATE SET description=excluded.description, "
+        "config_json=excluded.config_json, status='ACTIVE'",
+        [name, description, config_str]
+    )
+    d.commit()
+    rows = d.query("SELECT id FROM experiments WHERE name = ?", [name])
+    return int(rows[0]["id"]) if rows else 0
+
+
+def get_active_experiment() -> dict | None:
+    """Devuelve el experimento activo actual (el más reciente con status ACTIVE)."""
+    rows = db().query(
+        "SELECT * FROM experiments WHERE status = 'ACTIVE' ORDER BY id DESC LIMIT 1"
+    )
+    return rows[0] if rows else None
+
+
+def get_experiment_by_id(exp_id: int) -> dict | None:
+    rows = db().query("SELECT * FROM experiments WHERE id = ?", [exp_id])
+    return rows[0] if rows else None
+
+
+def list_experiments() -> list:
+    return db().query("SELECT * FROM experiments ORDER BY id DESC")
+
+
+def update_experiment_balance(exp_id: int, pnl: float):
+    """Actualiza el balance del experimento tras cerrar un trade."""
+    d = db()
+    rows = d.query("SELECT current_balance FROM experiments WHERE id = ?", [exp_id])
+    if not rows:
+        return
+    new_balance = float(rows[0]["current_balance"] or 10000.0) + pnl
+    d.execute(
+        "UPDATE experiments SET current_balance = ? WHERE id = ?",
+        [round(new_balance, 2), exp_id]
+    )
+    d.commit()
+
+
+def get_experiment_stats(exp_id: int) -> dict:
+    """Calcula métricas de rendimiento para un experimento."""
+    d = db()
+    trades = d.query(
+        "SELECT status, pnl, pnl_pct FROM paper_trades "
+        "WHERE experiment_id = ? AND status != 'OPEN'",
+        [exp_id]
+    )
+    exp = get_experiment_by_id(exp_id)
+    if not exp:
+        return {}
+
+    total  = len(trades)
+    wins   = sum(1 for t in trades if t["status"] == "WIN")
+    total_pnl = sum(float(t["pnl"] or 0) for t in trades)
+    win_rate  = wins / total * 100 if total > 0 else 0.0
+
+    return {
+        "id":              exp_id,
+        "name":            exp.get("name", ""),
+        "description":     exp.get("description", ""),
+        "status":          exp.get("status", "ACTIVE"),
+        "initial_balance": float(exp.get("initial_balance") or 10000.0),
+        "current_balance": float(exp.get("current_balance") or 10000.0),
+        "total_trades":    total,
+        "wins":            wins,
+        "losses":          total - wins,
+        "win_rate":        round(win_rate, 1),
+        "total_pnl":       round(total_pnl, 2),
+        "return_pct":      round(total_pnl / float(exp.get("initial_balance") or 10000.0) * 100, 2),
+    }
+
+
+def compare_experiments() -> list:
+    """Devuelve stats de todos los experimentos para comparación."""
+    exps = list_experiments()
+    return [get_experiment_stats(int(e["id"])) for e in exps]
 

@@ -50,6 +50,7 @@ from news_scraper import get_market_sentiment
 from feedback_engine import run_feedback_cycle
 from macro_analyzer import get_macro_context, is_high_impact_event_near
 from brain import process_bot_brain
+from experiment_engine import ensure_default_experiment
 
 
 def send_telegram(message: str):
@@ -107,7 +108,8 @@ def run_cycle(dry_run: bool = False):
     logger.info(f"{'─'*60}")
     logger.info(f"🔄 Z-SCORE SPREAD CYCLE — {start.strftime('%Y-%m-%d %H:%M UTC')}")
     log_heartbeat("RUNNING", f"Iniciando ciclo en {start.strftime('%H:%M')}")
-    broker = PaperBroker()
+    broker     = PaperBroker()
+    active_exp = ensure_default_experiment()
 
     # ── Sentimiento y contexto macro ──────────────────────────────────────────
     logger.info("📡 Obteniendo sentimiento y contexto macro...")
@@ -267,6 +269,7 @@ def run_cycle(dry_run: bool = False):
                     "beta_open":         beta,
                     "macro_regime":      macro.get("risk_appetite") if macro else None,
                     "eth_rsi_open":      spread_data["eth_rsi"],
+                    "experiment_id":     active_exp,
                 }
                 trade_id = broker.open_trade(
                     signal_id  = sig_id,

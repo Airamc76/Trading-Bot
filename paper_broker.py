@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 import config
 from database import (get_portfolio_balance, update_portfolio,
                        get_open_trades, open_paper_trade, close_paper_trade,
-                       get_bot_config, get_dashboard_data)
+                       get_bot_config, get_dashboard_data, update_experiment_balance)
 
 logger = logging.getLogger(__name__)
 
@@ -86,6 +86,7 @@ class PaperBroker:
             "beta_open":          ctx.get("beta_open"),
             "macro_regime":       ctx.get("macro_regime"),
             "eth_rsi_open":       ctx.get("eth_rsi_open"),
+            "experiment_id":      ctx.get("experiment_id"),
         })
         dir_label = "LONG SPREAD (BUY ETH)" if direction == "BUY" else "SHORT SPREAD (SELL ETH)"
         logger.info(f"📈 #{tid} {dir_label} | ETH @ ${price:,.2f} | "
@@ -127,6 +128,13 @@ class PaperBroker:
                 self.balance, self.balance,
                 f"#{t['id']} {reason} Z={z_score:.2f}"
             )
+            # Actualizar balance del experimento si el trade tenía uno asignado
+            exp_id = t.get("experiment_id")
+            if exp_id:
+                try:
+                    update_experiment_balance(int(exp_id), pnl)
+                except Exception:
+                    pass
             emoji = "✅" if pnl > 0 else "❌"
             logger.info(
                 f"{emoji} #{t['id']} {SPREAD_PAIR} {reason} | "

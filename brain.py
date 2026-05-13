@@ -16,7 +16,8 @@ import json
 import hashlib
 import statistics
 from datetime import datetime, timezone, timedelta
-from database import db, get_bot_config, set_bot_config, update_monthly_metrics
+from database import (db, get_bot_config, set_bot_config, update_monthly_metrics,
+                      compare_experiments)
 from llm_brain import run_llm_brain_cycle
 from improvement_engine import run_improvement_engine
 
@@ -606,6 +607,30 @@ def run_weekly_tournament():
     set_bot_config("WEEKLY_VERDICT", verdict)
     set_bot_config("WEEKLY_TOURNAMENT_LAST_RUN", now.isoformat())
     logger.info(f"🏆 {verdict}")
+
+    # Comparar experimentos activos
+    try:
+        exp_stats = compare_experiments()
+        if len(exp_stats) > 1:
+            ranked = sorted(
+                [s for s in exp_stats if s and s.get("total_trades", 0) > 0],
+                key=lambda x: x.get("total_pnl", 0), reverse=True
+            )
+            if ranked:
+                winner = ranked[0]
+                exp_summary = (
+                    f"RANKING EXPERIMENTOS {week_label}: "
+                    + " | ".join(
+                        f"#{s['name']} WR={s['win_rate']:.0f}% P&L=${s['total_pnl']:+.0f}"
+                        for s in ranked
+                    )
+                    + f" → GANADOR: {winner['name']}"
+                )
+                _record_thought("EXPERIMENT_RANKING", exp_summary, "POSITIVE")
+                set_bot_config("EXPERIMENT_RANKING", exp_summary)
+                logger.info(f"🏆 {exp_summary}")
+    except Exception as e:
+        logger.debug(f"experiment comparison: {e}")
 
 
 # ── Motor principal ──────────────────────────────────────────────────────────
