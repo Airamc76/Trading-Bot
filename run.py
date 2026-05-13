@@ -259,6 +259,15 @@ def run_cycle(dry_run: bool = False):
                 sig_id    = next(
                     (s["id"] for s in last_sigs if s["pair"] == "BTC_ETH_SPREAD"), 0
                 )
+                trade_context = {
+                    "strategy_name":     "ZSCORE_MEAN_REVERSION",
+                    "z_score_open":      z_score,
+                    "hurst_open":        hurst,
+                    "coint_pvalue_open": coint_pvalue,
+                    "beta_open":         beta,
+                    "macro_regime":      macro.get("risk_appetite") if macro else None,
+                    "eth_rsi_open":      spread_data["eth_rsi"],
+                }
                 trade_id = broker.open_trade(
                     signal_id  = sig_id,
                     pair       = "BTC_ETH_SPREAD",
@@ -266,6 +275,7 @@ def run_cycle(dry_run: bool = False):
                     price      = eth_price,
                     stop_loss  = signal.get("stop_loss"),
                     take_profit= signal.get("take_profit"),
+                    context    = trade_context,
                 )
                 if trade_id:
                     r     = signal.get("reasons", [])

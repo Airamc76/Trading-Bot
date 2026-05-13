@@ -45,7 +45,14 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     stop_loss      REAL, take_profit REAL,
     position_size  REAL, pnl REAL, pnl_pct REAL,
     status         TEXT DEFAULT 'OPEN',
-    close_reason   TEXT
+    close_reason   TEXT,
+    strategy_name     TEXT,
+    z_score_open      REAL,
+    hurst_open        REAL,
+    coint_pvalue_open REAL,
+    beta_open         REAL,
+    macro_regime      TEXT,
+    eth_rsi_open      REAL
 );
 CREATE TABLE IF NOT EXISTS portfolio (
     id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -289,12 +296,31 @@ def migrate_database():
         logger.warning(f"Error migrando signals: {e}")
 
     # 2. Asegurar que todas las tablas del SCHEMA existan
-    # initialize() ya lo hace con CREATE TABLE IF NOT EXISTS, 
-    # pero llamamos a initialize de nuevo por si acaso falló algo antes.
     try:
         d.initialize()
     except Exception as e:
         logger.warning(f"Error re-inicializando tablas: {e}")
+
+    # 3. Columnas de observabilidad en paper_trades
+    new_pt_cols = [
+        ("strategy_name",     "TEXT"),
+        ("z_score_open",      "REAL"),
+        ("hurst_open",        "REAL"),
+        ("coint_pvalue_open", "REAL"),
+        ("beta_open",         "REAL"),
+        ("macro_regime",      "TEXT"),
+        ("eth_rsi_open",      "REAL"),
+    ]
+    try:
+        existing = d.query("PRAGMA table_info(paper_trades)")
+        existing_names = {c["name"] for c in existing}
+        for col_name, col_type in new_pt_cols:
+            if col_name not in existing_names:
+                logger.info(f"➕ Añadiendo columna '{col_name}' a tabla 'paper_trades'...")
+                d.execute(f"ALTER TABLE paper_trades ADD COLUMN {col_name} {col_type}")
+                d.commit()
+    except Exception as e:
+        logger.warning(f"Error migrando columnas de paper_trades: {e}")
 
     logger.info("✅ Migraciones completadas")
 
@@ -385,10 +411,15 @@ def save_signal(signal: dict) -> int:
 def open_paper_trade(trade: dict) -> int:
     d = db()
     d.execute(
-        "INSERT INTO paper_trades (signal_id,pair,direction,open_time,open_price,stop_loss,take_profit,position_size,status) "
-        "VALUES (?,?,?,?,?,?,?,?,'OPEN')",
+        "INSERT INTO paper_trades "
+        "(signal_id,pair,direction,open_time,open_price,stop_loss,take_profit,position_size,"
+        "strategy_name,z_score_open,hurst_open,coint_pvalue_open,beta_open,macro_regime,eth_rsi_open,status) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'OPEN')",
         [trade["signal_id"], trade["pair"], trade["direction"], trade["open_time"],
-         trade["open_price"], trade["stop_loss"], trade["take_profit"], trade["position_size"]]
+         trade["open_price"], trade["stop_loss"], trade["take_profit"], trade["position_size"],
+         trade.get("strategy_name"), trade.get("z_score_open"), trade.get("hurst_open"),
+         trade.get("coint_pvalue_open"), trade.get("beta_open"), trade.get("macro_regime"),
+         trade.get("eth_rsi_open")]
     )
     d.commit()
     rows = d.query("SELECT id FROM paper_trades ORDER BY id DESC LIMIT 1")

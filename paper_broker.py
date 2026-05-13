@@ -51,12 +51,14 @@ class PaperBroker:
 
     def open_trade(self, signal_id: int, pair: str, direction: str,
                    price: float, stop_loss: float, take_profit: float,
-                   atr=None) -> int | None:
+                   atr=None, context: dict = None) -> int | None:
         """
         Abre un trade de spread.
         direction = 'BUY'  → Long ETH, Short BTC
         direction = 'SELL' → Short ETH, Long BTC
         El par siempre es BTC_ETH_SPREAD.
+        context   = dict con z_score_open, hurst_open, coint_pvalue_open, beta_open,
+                    macro_regime, eth_rsi_open para observabilidad del experimento.
         """
         if not self.can_open_trade():
             logger.info("🚫 Max open trades alcanzado — no se abre nuevo spread")
@@ -66,16 +68,24 @@ class PaperBroker:
             logger.info("🚫 Ya hay un spread trade abierto — esperando cierre")
             return None
 
+        ctx  = context or {}
         size = self._position_size(price, stop_loss)
         tid  = open_paper_trade({
-            "signal_id":     signal_id,
-            "pair":          SPREAD_PAIR,
-            "direction":     direction,
-            "open_time":     datetime.now(timezone.utc).isoformat(),
-            "open_price":    price,
-            "stop_loss":     stop_loss,
-            "take_profit":   take_profit,
-            "position_size": round(size, 2),
+            "signal_id":          signal_id,
+            "pair":               SPREAD_PAIR,
+            "direction":          direction,
+            "open_time":          datetime.now(timezone.utc).isoformat(),
+            "open_price":         price,
+            "stop_loss":          stop_loss,
+            "take_profit":        take_profit,
+            "position_size":      round(size, 2),
+            "strategy_name":      ctx.get("strategy_name", "ZSCORE_MEAN_REVERSION"),
+            "z_score_open":       ctx.get("z_score_open"),
+            "hurst_open":         ctx.get("hurst_open"),
+            "coint_pvalue_open":  ctx.get("coint_pvalue_open"),
+            "beta_open":          ctx.get("beta_open"),
+            "macro_regime":       ctx.get("macro_regime"),
+            "eth_rsi_open":       ctx.get("eth_rsi_open"),
         })
         dir_label = "LONG SPREAD (BUY ETH)" if direction == "BUY" else "SHORT SPREAD (SELL ETH)"
         logger.info(f"📈 #{tid} {dir_label} | ETH @ ${price:,.2f} | "

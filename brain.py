@@ -14,6 +14,7 @@ Principios:
 import logging
 import json
 import hashlib
+import statistics
 from datetime import datetime, timezone, timedelta
 from database import db, get_bot_config, set_bot_config, update_monthly_metrics
 from llm_brain import run_llm_brain_cycle
@@ -533,6 +534,80 @@ def _defensive_decay(d):
         logger.warning(f"⚠️ Error en defensive_decay: {e}")
 
 
+# ── Torneo semanal ───────────────────────────────────────────────────────────
+
+def run_weekly_tournament():
+    """
+    Corre en el primer ciclo de cada lunes.
+    Calcula métricas de la semana cerrada y guarda WEEKLY_VERDICT en bot_memory.
+    """
+    now = datetime.now(timezone.utc)
+    if now.weekday() != 0:  # 0 = lunes
+        return
+
+    last_run_str = get_bot_config("WEEKLY_TOURNAMENT_LAST_RUN", "")
+    if last_run_str:
+        try:
+            last_dt = datetime.fromisoformat(last_run_str)
+            if last_dt.tzinfo is None:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            if (now - last_dt).total_seconds() < 86400 * 6:  # ya corrió esta semana
+                return
+        except Exception:
+            pass
+
+    d = db()
+    week_ago = (now - timedelta(days=7)).isoformat()
+
+    trades = d.query(
+        "SELECT status, pnl, pnl_pct, open_time, close_time, "
+        "z_score_open, hurst_open, macro_regime "
+        "FROM paper_trades WHERE status != 'OPEN' AND close_time > ? ORDER BY id DESC",
+        [week_ago]
+    )
+
+    if not trades:
+        logger.info("🏆 Torneo semanal: sin trades cerrados esta semana")
+        set_bot_config("WEEKLY_TOURNAMENT_LAST_RUN", now.isoformat())
+        return
+
+    total     = len(trades)
+    wins      = [t for t in trades if t["status"] == "WIN"]
+    losses    = [t for t in trades if t["status"] == "LOSS"]
+    win_rate  = len(wins) / total * 100 if total > 0 else 0.0
+    pnls      = [_safe_float(t["pnl"]) for t in trades]
+    total_pnl = sum(pnls)
+    avg_pnl   = total_pnl / total if total > 0 else 0.0
+    best_pnl  = max(pnls) if pnls else 0.0
+    worst_pnl = min(pnls) if pnls else 0.0
+
+    # Sharpe semanal aproximado (anualizado × √52)
+    sharpe = 0.0
+    if len(pnls) > 1:
+        std = statistics.stdev(pnls)
+        if std > 0:
+            sharpe = (statistics.mean(pnls) / std) * (52 ** 0.5)
+
+    # Régimen macro más frecuente
+    regimes = [t["macro_regime"] for t in trades if t.get("macro_regime")]
+    dominant_regime = max(set(regimes), key=regimes.count) if regimes else "UNKNOWN"
+
+    week_label = now.strftime("%Y-W%W")
+    verdict = (
+        f"TORNEO SEMANAL {week_label}: "
+        f"{total} trades | WR {win_rate:.1f}% | P&L ${total_pnl:+.2f} | "
+        f"Avg ${avg_pnl:+.2f}/trade | Sharpe {sharpe:.2f} | "
+        f"Mejor ${best_pnl:+.2f} | Peor ${worst_pnl:+.2f} | "
+        f"Régimen: {dominant_regime}"
+    )
+
+    _record_thought("WEEKLY_VERDICT", verdict,
+                    "POSITIVE" if total_pnl > 0 else "NEGATIVE")
+    set_bot_config("WEEKLY_VERDICT", verdict)
+    set_bot_config("WEEKLY_TOURNAMENT_LAST_RUN", now.isoformat())
+    logger.info(f"🏆 {verdict}")
+
+
 # ── Motor principal ──────────────────────────────────────────────────────────
 
 def run_brain_reflection():
@@ -579,7 +654,6 @@ def process_bot_brain():
         run_brain_reflection()
 
         # 2. Ejecutar reflexión basada en LLM (intuitiva, estratégica)
-        # Solo corre si hay API keys y ha pasado el cooldown
         run_llm_brain_cycle()
 
         # 3. Actualizar métricas mensuales
@@ -590,6 +664,12 @@ def process_bot_brain():
 
         # 4. Analizar el estado del bot y generar solicitudes de mejora al usuario
         run_improvement_engine()
+
+        # 5. Torneo semanal (solo el primer ciclo de cada lunes)
+        try:
+            run_weekly_tournament()
+        except Exception as e:
+            logger.debug(f"run_weekly_tournament: {e}")
 
     except Exception as e:
         logger.error(f"Error en el cerebro del bot: {e}", exc_info=True)

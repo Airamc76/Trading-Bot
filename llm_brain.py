@@ -105,15 +105,26 @@ def _build_context_snapshot() -> dict:
 
     # Config actual del bot
     current_config = {
-        "active_strategy":  get_bot_config("ACTIVE_STRATEGY", "ALL"),
+        "active_strategy":  get_bot_config("ACTIVE_STRATEGY", "ZSCORE_MEAN_REVERSION"),
         "min_score":        get_bot_config("MIN_SCORE_TO_TRADE", "5.0"),
-        "stop_loss_atr":    get_bot_config("STOP_LOSS_ATR", "1.2"),
+        "zscore_entry":     get_bot_config("ZSCORE_ENTRY", "2.0"),
+        "zscore_stop":      get_bot_config("ZSCORE_STOP", "3.5"),
+        "hurst_threshold":  get_bot_config("HURST_THRESHOLD", "0.45"),
+        "coint_pvalue":     get_bot_config("COINT_PVALUE", "0.99"),
+        "trading_paused":   get_bot_config("TRADING_PAUSED", "false"),
         "paused_pairs":     get_bot_config("PAUSED_PAIRS", ""),
+        "weekly_verdict":   get_bot_config("WEEKLY_VERDICT", ""),
     }
 
     # Últimas reflexiones del brain (código)
     code_thoughts = d.query(
         "SELECT category, note, impact FROM bot_memory ORDER BY id DESC LIMIT 5"
+    )
+
+    # Memoria acumulativa: últimas 5 decisiones propias del LLM
+    md_diary = d.query(
+        "SELECT note, timestamp FROM bot_memory "
+        "WHERE category='LLM_REASONING' ORDER BY id DESC LIMIT 5"
     )
 
     # Balance histórico (últimas 10 snapshots)
@@ -124,54 +135,63 @@ def _build_context_snapshot() -> dict:
     bal_trend = "DECLINING" if len(balances) > 2 and balances[0] < balances[-1] else "STABLE_OR_GROWING"
 
     return {
-        "balance":       round(balance, 2),
-        "total_pnl":     round(total_pnl, 2),
-        "total_trades":  total,
-        "wins":          wins,
-        "losses":        losses,
-        "open_trades":   open_t,
-        "win_rate":      round(win_rate, 1),
-        "loss_streak":   loss_streak,
-        "balance_trend": bal_trend,
-        "last_trades":   last_trades,
+        "balance":        round(balance, 2),
+        "total_pnl":      round(total_pnl, 2),
+        "total_trades":   total,
+        "wins":           wins,
+        "losses":         losses,
+        "open_trades":    open_t,
+        "win_rate":       round(win_rate, 1),
+        "loss_streak":    loss_streak,
+        "balance_trend":  bal_trend,
+        "last_trades":    last_trades,
         "open_positions": open_trades,
-        "last_signals":  last_signals,
-        "macro":         macro[0] if macro else {},
-        "bot_config":    current_config,
-        "code_thoughts": code_thoughts,
-        "timestamp_utc": datetime.now(timezone.utc).isoformat()
+        "last_signals":   last_signals,
+        "macro":          macro[0] if macro else {},
+        "bot_config":     current_config,
+        "code_thoughts":  code_thoughts,
+        "md_diary":       md_diary,
+        "timestamp_utc":  datetime.now(timezone.utc).isoformat()
     }
 
 
 # ── Sistema de prompts ────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """Eres el Managing Director (MD) de APEX Trading Bot, un motor de razonamiento 100% autónomo. 
-Tu misión es tomar decisiones ejecutivas sobre la estrategia, el riesgo y la operativa del bot basándote en datos reales y los principios de John J. Murphy (Análisis Técnico de los Mercados Financieros).
+SYSTEM_PROMPT = """Eres el Managing Director (MD) de APEX Trading Bot, un motor de razonamiento 100% autónomo.
+Tu misión es tomar decisiones ejecutivas sobre riesgo y operativa de la estrategia Z-Score Mean Reversion sobre el spread BTC/ETH.
 
-Tu palabra es ley. Si decides pausar, el bot se pausa. Si decides cambiar de estrategia, el bot cambia.
+ESTRATEGIA ACTIVA: Z-Score Mean Reversion (spread log(ETH) - β×log(BTC)).
+- Entrada LONG ETH cuando Z-Score < -2.0σ (ETH infravalorada frente a BTC).
+- Entrada SHORT ETH cuando Z-Score > +2.0σ (ETH sobrevalorada frente a BTC).
+- Cierre TP cuando |Z| < 0.5σ (reversión a la media). Cierre SL cuando |Z| > 3.5σ.
+- El par BTC/ETH lleva >15 años cointegrado — el spread tiene tendencia a revertir.
 
-MANDATOS CRÍTICOS (Murphy's Laws):
-1. La tendencia es tu amiga: Opera a favor de la tendencia primaria. No intentes adivinar techos/suelos sin confirmación clara.
-2. El volumen confirma el precio: Si el precio sube pero el volumen/momentum cae, la tendencia es sospechosa.
-3. El mercado lo descuenta todo: Todo factor externo ya está en el precio. Confía en lo que ves en los datos.
-4. Gestiona el riesgo primero: Tu prioridad #1 es la supervivencia del capital.
-5. COSTO DE OPORTUNIDAD: Una inactividad prolongada (>24h) en mercados con tendencia es un fallo de gestión. No busques la perfección, busca la probabilidad a tu favor. Si has estado inactivo mucho tiempo, sé más flexible con el score (bájalo hacia 6.0) para retomar el pulso del mercado.
-6. Análisis Multitemporal: Considera que las señales de 1H/4H mandan sobre las de 15min.
+MEMORIA DE DECISIONES PREVIAS:
+El campo "md_diary" en el contexto contiene tus últimas 5 decisiones. ÚSALAS para:
+- Evitar repetir el mismo ajuste dos veces seguidas.
+- Ver si los ajustes anteriores mejoraron el rendimiento.
+- Detectar si estás en un ciclo de correcciones sin efecto.
+
+PRINCIPIOS DE GESTIÓN:
+1. Protege el capital primero. Drawdown >8% activa modo defensivo (score ≥7.5).
+2. Costo de oportunidad: inactividad >24h en mercado Z-Score válido es un fallo.
+3. Min score ajustable entre 4.5 y 9.5. No bajes de 4.5 ni subas de 9.5.
+4. Si el win rate mejora, normaliza el min_score hacia 5.5.
+5. PAUSA TOTAL solo en eventos macro críticos o drawdown severo (>15%).
 
 REGLAS DE RESPUESTA:
 - Responde ÚNICAMENTE con un objeto JSON válido. Sin markdown, sin texto adicional.
 - Los campos "thought" y "action_taken" deben estar SIEMPRE en Español.
-- Tu razonamiento debe ser FACTUAL: cita porcentajes de win rate, rachas de pérdidas, P&L exacto y regímenes macro.
+- Tu razonamiento debe ser FACTUAL: cita win rate exacto, P&L, Z-score promedio y régimen macro.
 
 JSON SCHEMA:
 {
-  "thought": "<Reasoning in Spanish citing specific data and Murphy's principles>",
-  "strategy_mode": "ALL | B_EMA_PULLBACK | R_RSI_EXTREME | M_MACD_MOMENTUM | PAUSE_ALL",
+  "thought": "<Razonamiento en Español citando datos específicos y decisiones previas del md_diary>",
+  "strategy_mode": "ZSCORE_MEAN_REVERSION | PAUSE_ALL",
   "min_score": <float 4.5 - 9.5>,
-  "stop_loss_atr": <float 0.8 - 3.0>,
-  "pairs_to_pause": ["PAIR1", "PAIR2"],
-  "pairs_to_resume": ["PAIR3"],
-  "action_taken": "<Summary in Spanish of the executive decision>",
+  "pairs_to_pause": [],
+  "pairs_to_resume": [],
+  "action_taken": "<Resumen en Español de la decisión ejecutiva>",
   "confidence": <int 1-10>,
   "market_regime": "TRENDING_UP | TRENDING_DOWN | CHOPPY | RISK_OFF | RISK_ON"
 }"""
@@ -290,16 +310,13 @@ Respond only with the JSON decision object."""
 
 def _validate_decision(decision: dict) -> dict:
     """Valida y limita las decisiones del LLM dentro de rangos seguros."""
-    # Strategy mode
-    valid_strategies = {"ALL", "B_EMA_PULLBACK", "R_RSI_EXTREME", "M_MACD_MOMENTUM", "PAUSE_ALL"}
+    # Strategy mode — solo Z-Score o pausa total
+    valid_strategies = {"ZSCORE_MEAN_REVERSION", "PAUSE_ALL"}
     if decision.get("strategy_mode") not in valid_strategies:
-        decision["strategy_mode"] = "ALL"
+        decision["strategy_mode"] = "ZSCORE_MEAN_REVERSION"
 
     # Min score — entre 4.5 y 9.5
     decision["min_score"] = max(4.5, min(9.5, _safe_float(decision.get("min_score"), 5.0)))
-
-    # Stop loss ATR — entre 0.8 y 3.0 (límite duro)
-    decision["stop_loss_atr"] = max(0.8, min(3.0, _safe_float(decision.get("stop_loss_atr"), 1.2)))
 
     # Listas
     if not isinstance(decision.get("pairs_to_pause"), list):
@@ -325,32 +342,21 @@ def _apply_decision(decision: dict):
     changes = []
     used_model = "ChatGPT" if OPENAI_API_KEY else ("Groq" if GROQ_API_KEY else "Gemini")
 
-    # Estrategia activa
-    old_strategy = get_bot_config("ACTIVE_STRATEGY", "ALL")
-    new_strategy  = decision["strategy_mode"]
-
+    # Modo de trading — Z-Score o pausa total
+    new_strategy = decision["strategy_mode"]
     if new_strategy == "PAUSE_ALL":
         set_bot_config("TRADING_PAUSED", "true")
         changes.append(f"Trading PAUSADO por LLM (confianza: {decision['confidence']}/10)")
     else:
         set_bot_config("TRADING_PAUSED", "false")
-        if old_strategy != new_strategy:
-            set_bot_config("ACTIVE_STRATEGY", new_strategy)
-            changes.append(f"Estrategia: {old_strategy} → {new_strategy}")
+        set_bot_config("ACTIVE_STRATEGY", "ZSCORE_MEAN_REVERSION")
 
     # Score mínimo
     old_score = _safe_float(get_bot_config("MIN_SCORE_TO_TRADE", "5.0"))
     new_score  = decision["min_score"]
-    if abs(old_score - new_score) >= 0.4:  # Solo cambiar si diferencia significativa
+    if abs(old_score - new_score) >= 0.4:
         set_bot_config("MIN_SCORE_TO_TRADE", str(round(new_score, 1)))
         changes.append(f"Min score: {old_score:.1f} → {new_score:.1f}")
-
-    # ATR de Stop Loss
-    old_atr = _safe_float(get_bot_config("STOP_LOSS_ATR", "1.2"))
-    new_atr  = decision["stop_loss_atr"]
-    if abs(old_atr - new_atr) >= 0.1:
-        set_bot_config("STOP_LOSS_ATR", str(round(new_atr, 2)))
-        changes.append(f"SL ATR: {old_atr:.2f} → {new_atr:.2f}")
 
     # Pares a pausar
     paused_str = get_bot_config("PAUSED_PAIRS", "")
